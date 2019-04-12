@@ -36,14 +36,14 @@ def get_atari_head_demos(env_name, data_dir):
     # accumulate stacks of 4 frames along the trajectory with an associated return of the 4th frame
     trajectories = []
     returns = []
+    gaze_maps = []
     for t in valid_trials:
         traj = []
         r = []
+        gaze = []
         img_dir = data_dir+'/'+t
-        game_file = data_dir+'/'+t+'.txt'
-        with open(game_file) as f:
-            lines = f.readlines()
-        lines = [x.strip() for x in lines] 
+        game_file = data_dir+'/'+t+'.txt'        
+        lines = read_gaze_file(game_file)
         img_paths = [os.path.join(img_dir, o) for o in os.listdir(img_dir)]
 
         for p in range(3,len(img_paths)):
@@ -59,10 +59,36 @@ def get_atari_head_demos(env_name, data_dir):
             # print(imgs_stacked.shape)
             traj.append(imgs_stacked)
             r.append(float(line[4])) # unclipped reward of 4th frame
+            gaze_points = line[6:]
+            gaze_map = generate_gaze_map(gaze_points, imgs[0].shape)
+            gaze.append(gaze_map)
+
         trajectories.append(traj)
         returns.append(r)
-
-    # sample random trajectories of length 50 and the associated returns for that length
+        gaze_maps.append(gaze)
 
     # return lists of associated partial trajectories and returns
     return trajectories, returns
+
+
+def read_gaze_file(game_file):
+    with open(game_file) as f:
+            lines = f.readlines()
+    lines = [x.strip() for x in lines] 
+    return lines
+        
+
+def generate_gaze_map(gaze, img_shape):
+    gaze_map = np.zeros((img_shape[0],img_shape[1]))
+    for j in range(0,len(gaze),2):
+        if('null' not in gaze[j]):
+            x = float(gaze[j])
+            y = float(gaze[j+1])
+            # print(gaze_map.shape)
+            # print(y,x)
+            gaze_map[min(int(y),img_shape[0]-1),min(int(x),img_shape[1]-1)] = 255.0
+
+    gaze_map = cv2.resize(gaze_map,(84,84))
+    # normalize gaze map 
+    # threshold values for a binary map
+    return gaze_map

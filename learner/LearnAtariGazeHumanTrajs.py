@@ -140,14 +140,30 @@ class Net(nn.Module):
         return torch.cat([cum_r_i, cum_r_j]), abs_r_i + abs_r_j
 
 
-
+    def conv_map(self, traj):
+        '''calculate cumulative return of trajectory'''
+        for x in traj:
+            x = x.permute(0,3,1,2) #get into NCHW format
+            #compute forward pass of reward network
+            x = F.leaky_relu(self.conv1(x))
+            x = F.leaky_relu(self.conv2(x))
+            x = F.leaky_relu(self.conv3(x))
+            x_final_conv = F.leaky_relu(self.conv4(x))
+            x_final_conv = x_final_conv.squeeze()
+            x_final_conv = x_final_conv.mean(dim=0)
+            # x = x.view(-1, 784)
+            # x = F.leaky_relu(self.fc1(x))            
+            # r = self.fc2(x)
+            print(x_final_conv.shape)
+            
+        return x_final_conv
 
 # Now we train the network. I'm just going to do it one by one for now. Could adapt it for minibatches to get better gradients
 
 # In[111]:
 
 
-def learn_reward(reward_network, optimizer, training_inputs, training_outputs, num_iter, l1_reg, checkpoint_dir):
+def learn_reward(reward_network, optimizer, training_inputs, training_outputs, num_iter, l1_reg, checkpoint_dir, use_gaze):
     #check if gpu available
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     # Assume that we are on a CUDA machine, then this should print a CUDA device:
@@ -177,7 +193,15 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
             outputs = outputs.unsqueeze(0)
             #print(outputs)
             #print(labels)
-            loss = loss_criterion(outputs, labels) + l1_reg * abs_rewards
+
+            # get conv map output
+            gaze_map_i = reward_network.conv_map(traj_i)
+            gaze_map_j = reward_network.conv_map(traj_j)
+            print(gaze_map_i.shape)
+            print(gaze_map_j.shape)
+
+            if(not(use_gaze)):
+                loss = loss_criterion(outputs, labels) + l1_reg * abs_rewards
             loss.backward()
             optimizer.step()
 
@@ -247,6 +271,7 @@ if __name__=="__main__":
     parser.add_argument('--reward_model_path', default='', help="name and location for learned model params")
     parser.add_argument('--seed', default=0, help="random seed for experiments")
     parser.add_argument('--data_dir', help="where atari-head data is located")
+    parser.add_argument('--use_gaze', default=False, help="where atari-head data is located")
 
     args = parser.parse_args()
     env_name = args.env_name
@@ -272,6 +297,7 @@ if __name__=="__main__":
         print("env_name not supported")
         sys.exit(1)
 
+    use_gaze = args.use_gaze
 
     env_type = "atari"
     print(env_type)
@@ -336,7 +362,7 @@ if __name__=="__main__":
     reward_net.to(device)
     import torch.optim as optim
     optimizer = optim.Adam(reward_net.parameters(),  lr=lr, weight_decay=weight_decay)
-    learn_reward(reward_net, optimizer, training_obs, training_labels, num_iter, l1_reg, args.reward_model_path)
+    learn_reward(reward_net, optimizer, training_obs, training_labels, num_iter, l1_reg, args.reward_model_path, use_gaze)
 
     with torch.no_grad():
         pred_returns = [predict_traj_return(reward_net, traj) for traj in demonstrations]
