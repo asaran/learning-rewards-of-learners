@@ -1,4 +1,5 @@
 import argparse
+# import agc.dataset as ds
 # coding: utf-8
 
 # Take length 50 snippets and record the cumulative return for each one. Then determine ground truth labels based on this.
@@ -15,100 +16,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from run_test import *
-
-def normalize_state(obs):
-    obs_highs = env.observation_space.high
-    obs_lows = env.observation_space.low
-    #print(obs_highs)
-    #print(obs_lows)
-    #return  2.0 * (obs - obs_lows) / (obs_highs - obs_lows) - 1.0
-    return obs / 255.0
-
-
-def mask_score(obs, crop_top = True):
-    if crop_top:
-        #takes a stack of four observations and blacks out (sets to zero) top n rows
-        n = 10
-        #no_score_obs = copy.deepcopy(obs)
-        obs[:,:n,:,:] = 0
-    else:
-        n = 20
-        obs[:,-n:,:,:] = 0
-    return obs
-
-def generate_novice_demos(env, env_name, agent, model_dir):
-    checkpoint_min = 50
-    checkpoint_max = 600
-    checkpoint_step = 50
-    checkpoints = []
-    crop_top = True
-    if env_name == "enduro":
-        checkpoint_min = 3100
-        checkpoint_max = 3650
-        crop_top = False
-    elif env_name == "seaquest":
-        checkpoint_min = 10
-        checkpoint_max = 65
-        checkpoint_step = 5
-    for i in range(checkpoint_min, checkpoint_max + checkpoint_step, checkpoint_step):
-        if i < 10:
-            checkpoints.append('0000' + str(i))
-        elif i < 100:
-            checkpoints.append('000' + str(i))
-        elif i < 1000:
-            checkpoints.append('00' + str(i))
-        elif i < 10000:
-            checkpoints.append('0' + str(i))
-    print(checkpoints)
-
-
-
-    demonstrations = []
-    learning_returns = []
-    learning_rewards = []
-    for checkpoint in checkpoints:
-
-        model_path = model_dir + "/models/" + env_name + "_25/" + checkpoint
-        if env_name == "seaquest":
-            model_path = model_dir + "/models/" + env_name + "_5/" + checkpoint
-
-        agent.load(model_path)
-        episode_count = 1
-        for i in range(episode_count):
-            done = False
-            traj = []
-            gt_rewards = []
-            r = 0
-
-            ob = env.reset()
-            #traj.append(ob)
-            #print(ob.shape)
-            steps = 0
-            acc_reward = 0
-            while True:
-                action = agent.act(ob, r, done)
-                ob, r, done, _ = env.step(action)
-                #print(ob.shape)
-                traj.append(mask_score(normalize_state(ob), crop_top))
-
-                gt_rewards.append(r[0])
-                steps += 1
-                acc_reward += r[0]
-                if done:
-                    print("checkpoint: {}, steps: {}, return: {}".format(checkpoint, steps,acc_reward))
-                    break
-            print("traj length", len(traj))
-            print("demo length", len(demonstrations))
-            demonstrations.append(traj)
-            learning_returns.append(acc_reward)
-            learning_rewards.append(gt_rewards)
-
-    return demonstrations, learning_returns, learning_rewards
-
-
-
-
-
+# import agc_demos
+from utils import get_atari_head_demos
 
 #cheat and sort them to see if it helps learning
 #sorted_demos = [x for _, x in sorted(zip(learning_returns,demonstrations), key=lambda pair: pair[0])]
@@ -123,7 +32,7 @@ def generate_novice_demos(env, env_name, agent, model_dir):
 
 # In[9]:
 
-def create_training_data(demonstrations, n_train, snippet_length):
+def create_training_data(demonstrations, returns, n_train):
     #n_train = 3000 #number of pairs of trajectories to create
     #snippet_length = 50
     training_obs = []
@@ -132,8 +41,11 @@ def create_training_data(demonstrations, n_train, snippet_length):
     for n in range(n_train):
         ti = 0
         tj = 0
+        r_i = 0
+        r_j = 0
         #only add trajectories that are different returns
-        while(ti == tj):
+        # while(ti == tj):
+        while(r_i == r_j):
             #pick two random demonstrations
             ti = np.random.randint(num_demos)
             tj = np.random.randint(num_demos)
@@ -142,8 +54,15 @@ def create_training_data(demonstrations, n_train, snippet_length):
             ti_start = np.random.randint(len(demonstrations[ti])-snippet_length)
             tj_start = np.random.randint(len(demonstrations[tj])-snippet_length)
             #print("start", ti_start, tj_start)
+
+
             traj_i = demonstrations[ti][ti_start:ti_start+snippet_length]
             traj_j = demonstrations[tj][tj_start:tj_start+snippet_length]
+
+            # print(returns[ti][ti_start:ti_start+snippet_length])
+            r_i = sum(returns[ti][ti_start:ti_start+snippet_length])
+            r_j = sum(returns[tj][tj_start:tj_start+snippet_length])
+
             #print('traj', traj_i, traj_j)
             #return_i = sum(learning_rewards[ti][ti_start:ti_start+snippet_length])
             #return_j = sum(learning_rewards[tj][tj_start:tj_start+snippet_length])
@@ -153,7 +72,10 @@ def create_training_data(demonstrations, n_train, snippet_length):
         #    label = 0
         #else:
         #    label = 1
-        if ti > tj:
+
+        # labels will be created differently
+
+        if r_i > r_j:
             label = 0
         else:
             label = 1
@@ -240,6 +162,7 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
         for i in range(len(training_labels)):
             traj_i, traj_j = training_obs[i]
             labels = np.array([[training_labels[i]]])
+            # print(traj_i)
             traj_i = np.array(traj_i)
             traj_j = np.array(traj_j)
             traj_i = torch.from_numpy(traj_i).float().to(device)
@@ -267,7 +190,7 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
                 print(abs_rewards)
                 cum_loss = 0.0
                 print("check pointing")
-                torch.save(reward_net.state_dict(), checkpoint_dir+"/"+str(i)+'.pth')
+                torch.save(reward_net.state_dict(), checkpoint_dir)
     print("finished training")
 
 
@@ -323,20 +246,32 @@ if __name__=="__main__":
     parser.add_argument('--env_name', default='', help='Select the environment name to run, i.e. pong')
     parser.add_argument('--reward_model_path', default='', help="name and location for learned model params")
     parser.add_argument('--seed', default=0, help="random seed for experiments")
-    parser.add_argument('--models_dir', default = ".", help="top directory where checkpoint models for demos are stored")
+    parser.add_argument('--data_dir', help="where atari-head data is located")
 
     args = parser.parse_args()
     env_name = args.env_name
     if env_name == "spaceinvaders":
         env_id = "SpaceInvadersNoFrameskip-v4"
+        agc_env_name =  "spaceinvaders"
     elif env_name == "mspacman":
         env_id = "MsPacmanNoFrameskip-v4"
+        agc_env_name = "mspacman"
     elif env_name == "videopinball":
         env_id = "VideoPinballNoFrameskip-v4"
-    elif env_name == "beamrider":
-        env_id = "BeamRiderNoFrameskip-v4"
+        agc_env_name = "pinball"
+    elif env_name == "montezumarevenge":
+        env_id = "MontezumaRevengeNoFrameskip-v4"
+        agc_env_name = "revenge"
+    elif env_name == "qbert":
+        env_id = "QbertNoFrameskip-v4"
+        agc_env_name = "qbert"
+    elif env_name == "hero":
+        env_id = "HeroNoFrameskip-v4"
+        agc_env_name = "hero"
     else:
-        env_id = env_name[0].upper() + env_name[1:] + "NoFrameskip-v4"
+        print("env_name not supported")
+        sys.exit(1)
+
 
     env_type = "atari"
     print(env_type)
@@ -347,7 +282,7 @@ if __name__=="__main__":
     tf.set_random_seed(seed)
 
     print("Training reward for", env_id)
-    n_train = 3000 #number of pairs of trajectories to create
+    n_train = 10000 #number of pairs of trajectories to create
     snippet_length = 50 #length of trajectory for training comparison
     lr = 0.0001
     weight_decay = 0.0
@@ -366,7 +301,12 @@ if __name__=="__main__":
     env = VecFrameStack(env, 4)
     agent = PPO2Agent(env, env_type, stochastic)
 
-    demonstrations, learning_returns, learning_rewards = generate_novice_demos(env, env_name, agent, args.models_dir)
+    data_dir = args.data_dir
+    # dataset = ds.AtariDataset(data_dir)
+    # demonstrations, learning_returns = agc_demos.get_preprocessed_trajectories(agc_env_name, dataset, data_dir)
+    demonstrations, learning_returns = get_atari_head_demos(env_name, data_dir)
+
+
     # Let's plot the returns to see if they are roughly monotonically increasing.
     #plt.plot(learning_returns)
     #plt.xlabel("Demonstration")
@@ -378,16 +318,16 @@ if __name__=="__main__":
 
     print(len(learning_returns))
     print(len(demonstrations))
-    print([a[0] for a in zip(learning_returns, demonstrations)])
+    # print([a[0] for a in zip(learning_returns, demonstrations)])
     #sort them based on human preferences
-    demonstrations = [x for _, x in sorted(zip(learning_returns,demonstrations), key=lambda pair: pair[0])]
+    # demonstrations = [x for _, x in sorted(zip(learning_returns,demonstrations), key=lambda pair: pair[0])]
 
-    sorted_returns = sorted(learning_returns)
-    print(sorted_returns)
+    # sorted_returns = sorted(learning_returns)
+    # print(sorted_returns)
     #plt.plot(sorted_returns)
     #plt.show()
 
-    training_obs, training_labels = create_training_data(demonstrations, n_train, snippet_length)
+    training_obs, training_labels = create_training_data(demonstrations, learning_returns, n_train)
     print("num training_obs", len(training_obs))
     print("num_labels", len(training_labels))
     # Now we create a reward network and optimize it using the training data.
@@ -401,10 +341,9 @@ if __name__=="__main__":
     with torch.no_grad():
         pred_returns = [predict_traj_return(reward_net, traj) for traj in demonstrations]
     for i, p in enumerate(pred_returns):
-        print(i,p,sorted_returns[i])
+        print(i,p,sum(learning_returns[i]))
 
     print("accuracy", calc_accuracy(reward_net, training_obs, training_labels))
 
-
     #TODO:add checkpoints to training process
-    torch.save(reward_net.state_dict(), args.reward_model_path+"/model.pth")
+    torch.save(reward_net.state_dict(), args.reward_model_path)
