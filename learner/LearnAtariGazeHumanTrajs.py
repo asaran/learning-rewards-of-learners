@@ -32,11 +32,12 @@ from utils import get_atari_head_demos
 
 # In[9]:
 
-def create_training_data(demonstrations, returns, n_train):
+def create_training_data(demonstrations, returns, gaze_maps, n_train):
     #n_train = 3000 #number of pairs of trajectories to create
     #snippet_length = 50
     training_obs = []
     training_labels = []
+    training_gaze = []
     num_demos = len(demonstrations)
     for n in range(n_train):
         ti = 0
@@ -55,13 +56,15 @@ def create_training_data(demonstrations, returns, n_train):
             tj_start = np.random.randint(len(demonstrations[tj])-snippet_length)
             #print("start", ti_start, tj_start)
 
-
             traj_i = demonstrations[ti][ti_start:ti_start+snippet_length]
             traj_j = demonstrations[tj][tj_start:tj_start+snippet_length]
 
             # print(returns[ti][ti_start:ti_start+snippet_length])
             r_i = sum(returns[ti][ti_start:ti_start+snippet_length])
             r_j = sum(returns[tj][tj_start:tj_start+snippet_length])
+
+            gaze_i = gaze_maps[ti][ti_start:ti_start+snippet_length]
+            gaze_j = gaze_maps[tj][tj_start:tj_start+snippet_length]
 
             #print('traj', traj_i, traj_j)
             #return_i = sum(learning_rewards[ti][ti_start:ti_start+snippet_length])
@@ -83,8 +86,9 @@ def create_training_data(demonstrations, returns, n_train):
         #TODO: maybe add indifferent label?
         training_obs.append((traj_i, traj_j))
         training_labels.append(label)
+        training_gaze.append((gaze_i, gaze_j))
 
-    return training_obs, training_labels
+    return training_obs, training_labels, training_gaze
 
 
 
@@ -149,21 +153,34 @@ class Net(nn.Module):
             x = F.leaky_relu(self.conv2(x))
             x = F.leaky_relu(self.conv3(x))
             x_final_conv = F.leaky_relu(self.conv4(x))
+            # print(x_final_conv.shape)
             x_final_conv = x_final_conv.squeeze()
-            x_final_conv = x_final_conv.mean(dim=0)
+            # print(x_final_conv.shape)
+            x_final_conv = x_final_conv.sum(dim=0)
             # x = x.view(-1, 784)
             # x = F.leaky_relu(self.fc1(x))            
             # r = self.fc2(x)
-            print(x_final_conv.shape)
+            # print(x_final_conv.shape) # [7,7]
+            # print(x_final_conv)
+            # print(torch.min(x_final_conv))
+            # print(torch.max(x_final_conv))
+            min_x = torch.min(x_final_conv)
+            max_x = torch.max(x_final_conv)
+            x_norm = (x_final_conv - min_x)/(max_x - min_x)
+            # print(x_norm)
             
-        return x_final_conv
+        return x_norm
 
 # Now we train the network. I'm just going to do it one by one for now. Could adapt it for minibatches to get better gradients
 
 # In[111]:
 
+def gaze_loss(true_gaze, conv_gaze):
+    loss = F.kl_div(true_gaze, conv_gaze)
+    return loss
 
-def learn_reward(reward_network, optimizer, training_inputs, training_outputs, num_iter, l1_reg, checkpoint_dir, use_gaze):
+
+def learn_reward(reward_network, optimizer, training_inputs, training_outputs, training_gaze, num_iter, l1_reg, gaze_reg, checkpoint_dir, use_gaze):
     #check if gpu available
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     # Assume that we are on a CUDA machine, then this should print a CUDA device:
@@ -178,12 +195,18 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
         for i in range(len(training_labels)):
             traj_i, traj_j = training_obs[i]
             labels = np.array([[training_labels[i]]])
+            gaze_i, gaze_j = training_gaze[i]
             # print(traj_i)
             traj_i = np.array(traj_i)
             traj_j = np.array(traj_j)
             traj_i = torch.from_numpy(traj_i).float().to(device)
             traj_j = torch.from_numpy(traj_j).float().to(device)
             labels = torch.from_numpy(labels).to(device)
+
+            gaze_i = np.array(gaze_i)
+            gaze_j = np.array(gaze_j)
+            gaze_i = torch.from_numpy(gaze_i).float().to(device)
+            gaze_j = torch.from_numpy(gaze_j).float().to(device)
 
             #zero out gradient
             optimizer.zero_grad()
@@ -197,11 +220,20 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
             # get conv map output
             gaze_map_i = reward_network.conv_map(traj_i)
             gaze_map_j = reward_network.conv_map(traj_j)
-            print(gaze_map_i.shape)
-            print(gaze_map_j.shape)
+            # print(gaze_map_i)
+            # print(gaze_map_j.shape)
 
             if(not(use_gaze)):
                 loss = loss_criterion(outputs, labels) + l1_reg * abs_rewards
+            else:
+                gaze_loss_i = gaze_loss(gaze_i, gaze_map_i)
+                gaze_loss_j = gaze_loss(gaze_j, gaze_map_j)
+                gaze_loss = (gaze_loss_i + gaze_loss_j)
+                output_loss = loss_criterion(outputs, labels)
+                print('output loss: ', output_loss)
+                print('gaze loss: ', gaze_loss)
+                loss = output_loss + l1_reg * abs_rewards + gaze_reg * gaze_loss
+
             loss.backward()
             optimizer.step()
 
@@ -315,6 +347,7 @@ if __name__=="__main__":
     num_iter = 5 #num times through training data
     l1_reg=0.0
     stochastic = True
+    gaze_reg = 0.5
 
     #env id, env type, num envs, and seed
     env = make_vec_env(env_id, 'atari', 1, seed,
@@ -330,7 +363,7 @@ if __name__=="__main__":
     data_dir = args.data_dir
     # dataset = ds.AtariDataset(data_dir)
     # demonstrations, learning_returns = agc_demos.get_preprocessed_trajectories(agc_env_name, dataset, data_dir)
-    demonstrations, learning_returns = get_atari_head_demos(env_name, data_dir)
+    demonstrations, learning_returns, gaze_maps = get_atari_head_demos(env_name, data_dir)
 
 
     # Let's plot the returns to see if they are roughly monotonically increasing.
@@ -353,7 +386,7 @@ if __name__=="__main__":
     #plt.plot(sorted_returns)
     #plt.show()
 
-    training_obs, training_labels = create_training_data(demonstrations, learning_returns, n_train)
+    training_obs, training_labels, training_gaze = create_training_data(demonstrations, learning_returns, gaze_maps, n_train)
     print("num training_obs", len(training_obs))
     print("num_labels", len(training_labels))
     # Now we create a reward network and optimize it using the training data.
@@ -362,7 +395,7 @@ if __name__=="__main__":
     reward_net.to(device)
     import torch.optim as optim
     optimizer = optim.Adam(reward_net.parameters(),  lr=lr, weight_decay=weight_decay)
-    learn_reward(reward_net, optimizer, training_obs, training_labels, num_iter, l1_reg, args.reward_model_path, use_gaze)
+    learn_reward(reward_net, optimizer, training_obs, training_labels, training_gaze, num_iter, l1_reg, gaze_reg, args.reward_model_path, use_gaze)
 
     with torch.no_grad():
         pred_returns = [predict_traj_return(reward_net, traj) for traj in demonstrations]

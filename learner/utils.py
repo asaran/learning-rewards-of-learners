@@ -68,7 +68,7 @@ def get_atari_head_demos(env_name, data_dir):
         gaze_maps.append(gaze)
 
     # return lists of associated partial trajectories and returns
-    return trajectories, returns
+    return trajectories, returns, gaze_maps
 
 
 def read_gaze_file(game_file):
@@ -85,10 +85,21 @@ def generate_gaze_map(gaze, img_shape):
             x = float(gaze[j])
             y = float(gaze[j+1])
             # print(gaze_map.shape)
-            # print(y,x)
-            gaze_map[min(int(y),img_shape[0]-1),min(int(x),img_shape[1]-1)] = 255.0
+            print(y,x)
+            # TODO: place a gaussian blob at gaze point
+            gaze_map[min(int(y),img_shape[0]-1),min(int(x),img_shape[1]-1)] = 1.0
+        else:
+            print('no gaze')
 
-    gaze_map = cv2.resize(gaze_map,(84,84))
+    gaze_map = cv2.resize(gaze_map,(7,7))
     # normalize gaze map 
+    gaze_min = np.min(gaze_map)
+    gaze_max = np.max(gaze_map)
+    print(gaze_map)
+    print('gaze max:', gaze_max)
+    print('gaze min:', gaze_min)
+    # TODO: denominator zero fix
+    gaze_map = (gaze_map-gaze_min)/(gaze_max-gaze_min)
+
     # threshold values for a binary map
     return gaze_map
