@@ -325,6 +325,9 @@ if __name__=="__main__":
     elif env_name == "hero":
         env_id = "HeroNoFrameskip-v4"
         agc_env_name = "hero"
+    elif env_name == "breakout":
+        env_id = "BreakoutNoFrameskip-v4"
+        agc_env_name = "breakout"
     else:
         print("env_name not supported")
         sys.exit(1)

@@ -26,7 +26,7 @@ def get_atari_head_demos(env_name, data_dir):
         print(f'Processed {line_count} lines.')
         # print(trial_nums)
     # enumerate folder names for the correct game (env_name)
-    d = data_dir
+    d = data_dir+'/'+env_name
     trials = [o for o in os.listdir(d) 
                         if os.path.isdir(os.path.join(d,o))]
     # print(trials)
@@ -41,10 +41,11 @@ def get_atari_head_demos(env_name, data_dir):
         traj = []
         r = []
         gaze = []
-        img_dir = data_dir+'/'+t
-        game_file = data_dir+'/'+t+'.txt'        
+        img_dir = data_dir+'/'+env_name+'/'+t
+        game_file = data_dir+'/'+env_name+'/'+t+'.txt'        
         lines = read_gaze_file(game_file)
         img_paths = [os.path.join(img_dir, o) for o in os.listdir(img_dir)]
+        # print(img_paths)
 
         for p in range(3,len(img_paths)):
             line = lines[p].split(',')
@@ -85,19 +86,20 @@ def generate_gaze_map(gaze, img_shape):
             x = float(gaze[j])
             y = float(gaze[j+1])
             # print(gaze_map.shape)
-            print(y,x)
+            # print(y,x)
             # TODO: place a gaussian blob at gaze point
             gaze_map[min(int(y),img_shape[0]-1),min(int(x),img_shape[1]-1)] = 1.0
         else:
-            print('no gaze')
+            # print('no gaze')
+            nogaze = 1
 
     gaze_map = cv2.resize(gaze_map,(7,7))
     # normalize gaze map 
     gaze_min = np.min(gaze_map)
     gaze_max = np.max(gaze_map)
-    print(gaze_map)
-    print('gaze max:', gaze_max)
-    print('gaze min:', gaze_min)
+    # print(gaze_map)
+    # print('gaze max:', gaze_max)
+    # print('gaze min:', gaze_min)
     # TODO: denominator zero fix
     gaze_map = (gaze_map-gaze_min)/(gaze_max-gaze_min)
 
