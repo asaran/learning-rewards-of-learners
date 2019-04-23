@@ -19,6 +19,14 @@ def evaluate_learned_policy(env_name, checkpoint, rep):
         env_id = "VideoPinballNoFrameskip-v4"
     elif env_name == "beamrider":
         env_id = "BeamRiderNoFrameskip-v4"
+    elif env_name == "seaquest":
+        env_id = "SeaquestNoFrameskip-v4"
+    elif env_name == "enduro":
+        env_id = "EnduroNoFrameskip-v4"
+    elif env_name == "hero":
+        env_id = "HeroNoFrameskip-v4"
+    elif env_name == "breakout":
+        env_id = "BreakoutNoFrameskip-v4"
     else:
         env_id = env_name[0].upper() + env_name[1:] + "NoFrameskip-v4"
 
