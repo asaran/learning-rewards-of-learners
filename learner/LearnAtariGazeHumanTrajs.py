@@ -328,6 +328,12 @@ if __name__=="__main__":
     elif env_name == "breakout":
         env_id = "BreakoutNoFrameskip-v4"
         agc_env_name = "breakout"
+    elif env_name == "seaquest":
+        env_id = "SeaquestNoFrameskip-v4"
+        agc_env_name = "seaquest"
+    elif env_name == "enduro":
+        env_id = "EnduroNoFrameskip-v4"
+        agc_env_name = "enduro"
     else:
         print("env_name not supported")
         sys.exit(1)

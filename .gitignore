@@ -4,7 +4,7 @@ baselines/
 learner/learned_models/akanksha_hero
 learner/learned_models/akanksha_spaceinvaders/
 learner/path_to_logs/
-
+data/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

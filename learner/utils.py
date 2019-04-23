@@ -13,7 +13,7 @@ def get_atari_head_demos(env_name, data_dir):
         line_count = 0
         for row in csv_reader:
             if line_count == 0:
-                print(f'Column names are {", ".join(row)}')
+                #print(f'Column names are {", ".join(row)}')
                 line_count += 1
             else:
                 # print(f'\t{row[0]} works in the {row[1]} department, and was born in {row[2]}.')
@@ -23,7 +23,7 @@ def get_atari_head_demos(env_name, data_dir):
                     # print(game_name)
                     trial_nums.append(row[1])
                 line_count += 1
-        print(f'Processed {line_count} lines.')
+        #print(f'Processed {line_count} lines.')
         # print(trial_nums)
     # enumerate folder names for the correct game (env_name)
     d = data_dir+'/'+env_name
