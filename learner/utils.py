@@ -59,7 +59,12 @@ def get_atari_head_demos(env_name, data_dir):
             # imgs_stacked = imgs_stacked.unsqueeze(0)
             # print(imgs_stacked.shape)
             traj.append(imgs_stacked)
-            r.append(float(line[4])) # unclipped reward of 4th frame
+
+            if line[4]!='null':
+                r.append(float(line[4])) # unclipped reward of 4th frame
+            else:
+                r.append(0)
+            
             gaze_points = line[6:]
             gaze_map = generate_gaze_map(gaze_points, imgs[0].shape)
             gaze.append(gaze_map)
