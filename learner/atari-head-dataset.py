@@ -7,20 +7,16 @@ import numpy as np
 
 class AtariHeadDataset():
 
-    # TRAJS_SUBDIR = 'trajectories'
-    # SCREENS_SUBDIR = 'screens'
-
     def __init__(self, env_name, data_path):
         
         '''
             Loads the dataset trajectories into memory. 
             data_path is the root of the dataset (the folder, which contains
-            the 'screens' and 'trajectories' folders. 
+            the game folders, each of which contains the trajectory folders. 
         '''
 
         self.trajs_path = data_path  
         self.env_name = env_name    
-        # self.screens_path = path.join(data_path, AtariDataset.SCREENS_SUBDIR)
     
         #check that the we have the trajs where expected
         assert path.exists(self.trajs_path)
@@ -78,10 +74,9 @@ class AtariHeadDataset():
 
         trajectories = {}
         extra_episodes = 0
-        # for game in listdir(self.trajs_path):
         game = self.env_name
         trajectories[game] = {}
-        # game_dir = path.join(self.trajs_path, game)
+
         game_dir = d
         for traj in listdir(game_dir):
             if(traj in valid_trials):
