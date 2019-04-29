@@ -4,9 +4,6 @@ import argparse
 
 # Take length 50 snippets and record the cumulative return for each one. Then determine ground truth labels based on this.
 
-# In[1]:
-
-
 import pickle
 import gym
 import time
@@ -17,24 +14,20 @@ import torch.nn as nn
 import torch.nn.functional as F
 from run_test import *
 # import agc_demos
-from utils import get_atari_head_demos
+# from utils import get_atari_head_demos
+import atari_head_dataset as ahd 
+import utils
 
 #cheat and sort them to see if it helps learning
 #sorted_demos = [x for _, x in sorted(zip(learning_returns,demonstrations), key=lambda pair: pair[0])]
-
 #sorted_returns = sorted(learning_returns)
 #print(sorted_returns)
 #plt.plot(sorted_returns)
 
 
 # Create training data by taking random 50 length crops of trajectories, computing the true returns and adding them to the training data with the correct label.
-#
-
-# In[9]:
-
-def create_training_data(demonstrations, returns, gaze_maps, n_train):
-    #n_train = 3000 #number of pairs of trajectories to create
-    #snippet_length = 50
+# def create_training_data(demonstrations, returns, gaze_maps, n_train):
+def create_training_data(demonstrations, returns, n_train):
     training_obs = []
     training_labels = []
     training_gaze = []
@@ -63,21 +56,11 @@ def create_training_data(demonstrations, returns, gaze_maps, n_train):
             r_i = sum(returns[ti][ti_start:ti_start+snippet_length])
             r_j = sum(returns[tj][tj_start:tj_start+snippet_length])
 
-            gaze_i = gaze_maps[ti][ti_start:ti_start+snippet_length]
-            gaze_j = gaze_maps[tj][tj_start:tj_start+snippet_length]
+            # gaze_i = gaze_maps[ti][ti_start:ti_start+snippet_length]
+            # gaze_j = gaze_maps[tj][tj_start:tj_start+snippet_length]
 
-            #print('traj', traj_i, traj_j)
-            #return_i = sum(learning_rewards[ti][ti_start:ti_start+snippet_length])
-            #return_j = sum(learning_rewards[tj][tj_start:tj_start+snippet_length])
-            #print("returns", return_i, return_j)
-
-        #if return_i > return_j:
-        #    label = 0
-        #else:
-        #    label = 1
 
         # labels will be created differently
-
         if r_i > r_j:
             label = 0
         else:
@@ -89,9 +72,6 @@ def create_training_data(demonstrations, returns, gaze_maps, n_train):
         training_gaze.append((gaze_i, gaze_j))
 
     return training_obs, training_labels, training_gaze
-
-
-
 
 
 
@@ -250,6 +230,72 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, t
     print("finished training")
 
 
+def learn_reward(reward_network, optimizer, training_inputs, training_outputs, num_iter, l1_reg, checkpoint_dir):
+    #check if gpu available
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # Assume that we are on a CUDA machine, then this should print a CUDA device:
+    print(device)
+    loss_criterion = nn.CrossEntropyLoss()
+    #print(training_data[0])
+    cum_loss = 0.0
+    training_data = list(zip(training_inputs, training_outputs))
+    for epoch in range(num_iter):
+        np.random.shuffle(training_data)
+        training_obs, training_labels = zip(*training_data)
+        for i in range(len(training_labels)):
+            traj_i, traj_j = training_obs[i]
+            labels = np.array([[training_labels[i]]])
+            # gaze_i, gaze_j = training_gaze[i]
+            # print(traj_i)
+            traj_i = np.array(traj_i)
+            traj_j = np.array(traj_j)
+            traj_i = torch.from_numpy(traj_i).float().to(device)
+            traj_j = torch.from_numpy(traj_j).float().to(device)
+            labels = torch.from_numpy(labels).to(device)
+
+            # gaze_i = np.array(gaze_i)
+            # gaze_j = np.array(gaze_j)
+            # gaze_i = torch.from_numpy(gaze_i).float().to(device)
+            # gaze_j = torch.from_numpy(gaze_j).float().to(device)
+
+            #zero out gradient
+            optimizer.zero_grad()
+
+            #forward + backward + optimize
+            outputs, abs_rewards = reward_network.forward(traj_i, traj_j)
+            outputs = outputs.unsqueeze(0)
+
+            # get conv map output
+            # gaze_map_i = reward_network.conv_map(traj_i)
+            # gaze_map_j = reward_network.conv_map(traj_j)
+
+
+            # if(not(use_gaze)):
+            #     loss = loss_criterion(outputs, labels) + l1_reg * abs_rewards
+            # else:
+            # gaze_loss_i = gaze_loss(gaze_i, gaze_map_i)
+            # gaze_loss_j = gaze_loss(gaze_j, gaze_map_j)
+            # gaze_loss = (gaze_loss_i + gaze_loss_j)
+            output_loss = loss_criterion(outputs, labels)
+            print('output loss: ', output_loss)
+            print('gaze loss: ', gaze_loss)
+            # loss = output_loss + l1_reg * abs_rewards + gaze_reg * gaze_loss
+            loss = output_loss + l1_reg * abs_rewards
+
+            loss.backward()
+            optimizer.step()
+
+            #print stats to see if learning
+            item_loss = loss.item()
+            cum_loss += item_loss
+            if i % 500 == 499:
+                #print(i)
+                print("epoch {}:{} loss {}".format(epoch,i, cum_loss))
+                print(abs_rewards)
+                cum_loss = 0.0
+                print("check pointing")
+                torch.save(reward_net.state_dict(), checkpoint_dir+"/"+str(i)+'.pth')
+    print("finished training")
 
 
 
@@ -350,7 +396,7 @@ if __name__=="__main__":
 
     print("Training reward for", env_id)
     n_train = 10000 #number of pairs of trajectories to create
-    snippet_length = 50 #length of trajectory for training comparison
+    snippet_length = 500 #length of trajectory for training comparison
     lr = 0.0001
     weight_decay = 0.0
     num_iter = 5 #num times through training data
@@ -372,7 +418,9 @@ if __name__=="__main__":
     data_dir = args.data_dir
     # dataset = ds.AtariDataset(data_dir)
     # demonstrations, learning_returns = agc_demos.get_preprocessed_trajectories(agc_env_name, dataset, data_dir)
-    demonstrations, learning_returns, gaze_maps = get_atari_head_demos(env_name, data_dir)
+    dataset = ahd.AtariHeadDataset(env_name, data_dir)
+    demonstrations, learning_returns = utils.get_preprocessed_trajectories(env_name, dataset)
+    # demonstrations, learning_returns, gaze_maps = get_atari_head_demos(env_name, data_dir)
 
 
     # Let's plot the returns to see if they are roughly monotonically increasing.
@@ -395,7 +443,8 @@ if __name__=="__main__":
     #plt.plot(sorted_returns)
     #plt.show()
 
-    training_obs, training_labels, training_gaze = create_training_data(demonstrations, learning_returns, gaze_maps, n_train)
+    # training_obs, training_labels, training_gaze = create_training_data(demonstrations, learning_returns, gaze_maps, n_train)
+    training_obs, training_labels = create_training_data(demonstrations, learning_returns, n_train)
     print("num training_obs", len(training_obs))
     print("num_labels", len(training_labels))
     # Now we create a reward network and optimize it using the training data.
@@ -404,7 +453,7 @@ if __name__=="__main__":
     reward_net.to(device)
     import torch.optim as optim
     optimizer = optim.Adam(reward_net.parameters(),  lr=lr, weight_decay=weight_decay)
-    learn_reward(reward_net, optimizer, training_obs, training_labels, training_gaze, num_iter, l1_reg, gaze_reg, args.reward_model_path, use_gaze)
+    learn_reward(reward_net, optimizer, training_obs, training_labels,  num_iter, l1_reg, args.reward_model_path)
 
     with torch.no_grad():
         pred_returns = [predict_traj_return(reward_net, traj) for traj in demonstrations]
@@ -414,4 +463,4 @@ if __name__=="__main__":
     print("accuracy", calc_accuracy(reward_net, training_obs, training_labels))
 
     #TODO:add checkpoints to training process
-    torch.save(reward_net.state_dict(), args.reward_model_path)
+    torch.save(reward_net.state_dict(), args.reward_model_path+"/model.pth")

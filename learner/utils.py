@@ -183,13 +183,16 @@ def get_sorted_traj_indices(env_name, dataset):
     elif env_name == "mspacman":
         start = 0
         skip = 1
+    else:   # TODO: confirm best logic for all games
+        start = 0
+        skip = 3
     num_demos = 12
     demos = non_duplicates[start:num_demos*skip + start:skip]
     print("(index, score) pairs:",demos)
     return demos
 
 
-def get_preprocces_trajectories(env_name, dataset):
+def get_preprocessed_trajectories(env_name, dataset):
     """returns an array of trajectories corresponding to what you would get running checkpoints from PPO
        demonstrations are grayscaled, maxpooled, stacks of 4 with normalized values between 0 and 1 and
        top section of screen is masked
@@ -214,7 +217,7 @@ def get_preprocces_trajectories(env_name, dataset):
         #normalize values to be between 0 and 1 and have top part masked
         for ob in stacked_traj:
             # demo_norm_mask.append(mask_score(normalize_state(ob), crop_top))
-            demo_norm_mask.append(normalize_state(ob))
+            demo_norm_mask.append(normalize_state(ob))  # currently not cropping
         human_demos.append(demo_norm_mask)
     return human_demos, human_scores
 

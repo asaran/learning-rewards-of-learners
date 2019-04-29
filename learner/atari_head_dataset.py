@@ -69,11 +69,12 @@ class AtariHeadDataset():
 
         # trajectory folder names for the chosen env
         valid_trials = [t for t in trials if t.split('_')[0] in trial_nums]
+        valid_trial_nums = [int(t.split('_')[0]) for t in trials if t.split('_')[0] in trial_nums]
         print('valid trials:', valid_trials)
 
 
         trajectories = {}
-        extra_episodes = 0
+        # extra_episodes = 0
         game = self.env_name
         trajectories[game] = {}
 
@@ -103,7 +104,10 @@ class AtariHeadDataset():
                             # start a new current trajectory if next epiosde begins
                             # save traj number beginning from 0 for these initial episodes
                             if(curr_trans['episode']!=last_episode):
-                                trajectories[game][extra_episodes] = curr_traj
+                                extra_episode_num = int(traj.split('_')[0]
+                                while extra_episode_num in valid_trial_nums:
+                                    extra_episode_num = np.randint(0)
+                                trajectories[game][extra_episode_num] = curr_traj
                                 curr_traj = []
                                 extra_episodes += 1
                             else:
