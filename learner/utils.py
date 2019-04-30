@@ -152,6 +152,7 @@ def get_sorted_traj_indices(env_name, dataset):
     traj_indices = []
     traj_scores = []
     traj_dirs = []
+    traj_rewards = []
     for t in dataset.trajectories[g]:
         # if env_name == "revenge":
         #     traj_indices.append(t)
@@ -161,10 +162,12 @@ def get_sorted_traj_indices(env_name, dataset):
         traj_indices.append(t)
         traj_scores.append(dataset.trajectories[g][t][-1]['score'])
         traj_dirs.append(dataset.trajectories[g][t][-1]['img_dir'])
+        traj_rewards.append([dataset.trajectories[g][t][i]['reward'] for i in range(len(dataset.trajectories[g][t]))])
 
     sorted_traj_indices = [x for _, x in sorted(zip(traj_scores, traj_indices), key=lambda pair: pair[0])]
     sorted_traj_scores = sorted(traj_scores)
     sorted_traj_dirs = [x for _, x in sorted(zip(traj_scores, traj_dirs), key=lambda pair: pair[0])]
+    sorted_traj_rewards = [x for _, x in sorted(zip(traj_scores, traj_rewards), key=lambda pair: pair[0])]
 
     print(sorted_traj_scores)
     #print(len(sorted_traj_scores))
@@ -174,10 +177,10 @@ def get_sorted_traj_indices(env_name, dataset):
     #so how do we want to get demos? how many do we have if we remove duplicates?
     seen_scores = set()
     non_duplicates = []
-    for i,s,d in zip(sorted_traj_indices, sorted_traj_scores, sorted_traj_dirs):
+    for i,s,d,r in zip(sorted_traj_indices, sorted_traj_scores, sorted_traj_dirs, sorted_traj_rewards):
         if s not in seen_scores:
             seen_scores.add(s)
-            non_duplicates.append((i,s,d))
+            non_duplicates.append((i,s,d, r))
     print("num non duplicate scores", len(seen_scores))
     if env_name == "spaceinvaders":
         start = 0
@@ -215,8 +218,10 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir):
     demos = get_sorted_traj_indices(env_name, dataset)
     human_scores = []
     human_demos = []
-    for indx, score, img_dir in demos:
+    human_rewards = []
+    for indx, score, img_dir, rew in demos:
         human_scores.append(score)
+        human_rewards.append(rew)
         # traj_dir = path.join(data_dir, 'screens', env_name, str(indx))
         traj_dir = path.join(data_dir, env_name, img_dir)
         #print("generating traj from", traj_dir)
@@ -228,7 +233,7 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir):
             # demo_norm_mask.append(mask_score(normalize_state(ob), crop_top))
             demo_norm_mask.append(normalize_state(ob))  # currently not cropping
         human_demos.append(demo_norm_mask)
-    return human_demos, human_scores
+    return human_demos, human_scores, human_rewards
 
 
 def read_gaze_file(game_file):

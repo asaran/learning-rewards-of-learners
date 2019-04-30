@@ -27,16 +27,16 @@ import utils
 
 # Create training data by taking random 50 length crops of trajectories, computing the true returns and adding them to the training data with the correct label.
 # def create_training_data(demonstrations, returns, gaze_maps, n_train):
-def create_training_data(demonstrations, returns, n_train):
+def create_training_data(demonstrations, returns, rewards, n_train):
     training_obs = []
     training_labels = []
     # training_gaze = []
     num_demos = len(demonstrations)
     for n in range(n_train):
-        ti = 0
-        tj = 0
-        r_i = 0
-        r_j = 0
+        ti, tj = 0, 0
+        r_i, r_j = 0, 0   
+        rew_i, rew_j = 0, 0
+
         #only add trajectories that are different returns
         # while(ti == tj):
         while(r_i == r_j):
@@ -53,9 +53,12 @@ def create_training_data(demonstrations, returns, n_train):
             traj_j = demonstrations[tj][tj_start:tj_start+snippet_length]
 
             # print(returns[ti][ti_start:ti_start+snippet_length])
-            print((returns[ti]))
-            r_i = sum(returns[ti][ti_start:ti_start+snippet_length])
-            r_j = sum(returns[tj][tj_start:tj_start+snippet_length])
+            # print((returns[ti]))
+            r_i = returns[ti]
+            r_j = returns[tj]
+
+            rew_i = sum(rewards[ti][ti_start:ti_start+snippet_length])
+            rew_j = sum(rewards[tj][tj_start:tj_start+snippet_length])
 
             # gaze_i = gaze_maps[ti][ti_start:ti_start+snippet_length]
             # gaze_j = gaze_maps[tj][tj_start:tj_start+snippet_length]
@@ -415,7 +418,7 @@ if __name__=="__main__":
     # dataset = ds.AtariDataset(data_dir)
     # demonstrations, learning_returns = agc_demos.get_preprocessed_trajectories(agc_env_name, dataset, data_dir)
     dataset = ahd.AtariHeadDataset(env_name, data_dir)
-    demonstrations, learning_returns = utils.get_preprocessed_trajectories(env_name, dataset, data_dir)
+    demonstrations, learning_returns, learning_rewards = utils.get_preprocessed_trajectories(env_name, dataset, data_dir)
     # demonstrations, learning_returns, gaze_maps = get_atari_head_demos(env_name, data_dir)
 
 
@@ -440,7 +443,7 @@ if __name__=="__main__":
     #plt.show()
 
     # training_obs, training_labels, training_gaze = create_training_data(demonstrations, learning_returns, gaze_maps, n_train)
-    training_obs, training_labels = create_training_data(demonstrations, learning_returns, n_train)
+    training_obs, training_labels = create_training_data(demonstrations, learning_returns, learning_rewards, n_train)
     print("num training_obs", len(training_obs))
     print("num_labels", len(training_labels))
     # Now we create a reward network and optimize it using the training data.
