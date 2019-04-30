@@ -22,6 +22,8 @@ class AtariHeadDataset():
         assert path.exists(self.trajs_path)
         
         self.trajectories = self.load_trajectories()
+        print((self.trajectories['breakout'].keys()))
+        # print((self.trajectories['breakout'][205]))
 
         # compute the stats after loading
         self.stats = {}
@@ -44,7 +46,6 @@ class AtariHeadDataset():
 
 
     def load_trajectories(self):
-
         print('env name: ', self.env_name)
         # read the meta data csv file
         trial_nums = []
@@ -57,20 +58,22 @@ class AtariHeadDataset():
                 else:
                     game_name = row[0].lower()
                     if game_name==self.env_name:
-                        trial_nums.append(row[1])
+                        trial_nums.append(int(row[1]))
                     line_count += 1
 
         d = path.join(self.trajs_path, self.env_name)
         trials = [o for o in listdir(d) 
                             if path.isdir(path.join(d,o))]
+        # print(trial_nums)
 
         # discard trial numbers <180 (episode # not recorded)
         trial_nums = [t for t in trial_nums if t>=180]
 
         # trajectory folder names for the chosen env
-        valid_trials = [t for t in trials if t.split('_')[0] in trial_nums]
-        valid_trial_nums = [int(t.split('_')[0]) for t in trials if t.split('_')[0] in trial_nums]
+        valid_trials = [t for t in trials if int(t.split('_')[0]) in trial_nums]
+        valid_trial_nums = [int(t.split('_')[0]) for t in trials if int(t.split('_')[0]) in trial_nums]
         print('valid trials:', valid_trials)
+        print('valid trial nums:', valid_trial_nums)
 
 
         trajectories = {}
@@ -79,39 +82,46 @@ class AtariHeadDataset():
         trajectories[game] = {}
 
         game_dir = d
+        # print(game_dir)
         for traj in listdir(game_dir):
-            if(traj in valid_trials):
+            # print(traj)
+            if(traj.endswith('.txt') and int(traj.split('_')[0]) in valid_trial_nums):
                 curr_traj = []
                 last_episode = 0
-                with open(path.join(game_dir, traj+'.txt')) as f:
+                with open(path.join(game_dir, traj)) as f:
                     for i,line in enumerate(f):
                         #first line is the metadata, second is the header
                         if i > 1:
                             #TODO will fix the spacing and True/False/integer in the next replay session
                             #frame,reward,score,terminal, action
                             curr_data = line.rstrip('\n').split(',')
-
+                            
                             # curr_data = line.rstrip('\n').replace(" ","").split(',')
-                            curr_trans = {}
-                            curr_trans['frame']    = int(curr_data[0])
-                            curr_trans['episode']  = int(curr_data[1])                           
-                            curr_trans['score']    = int(curr_data[2])
-                            curr_trans['duration']   = int(curr_data[3])
-                            curr_trans['reward']   = int(curr_data[4])
-                            curr_trans['action']   = int(curr_data[5])
-                            curr_trans['gaze_positions']   = int(curr_data[6:])
+                            if curr_data[2]!='null':
+                                curr_trans = {}
+                                curr_trans['frame']    = (curr_data[0])
+                                curr_trans['episode']  = int(curr_data[1]) if curr_data[1]!='null' else float('nan')                       
+                                curr_trans['score']    = int(curr_data[2])  
+                                curr_trans['duration'] = int(curr_data[3]) if curr_data[3]!='null' else float('nan')     
+                                curr_trans['reward']   = int(curr_data[4]) if curr_data[4]!='null' else float('nan')     
+                                curr_trans['action']   = int(curr_data[5]) if curr_data[5]!='null' else float('nan')     
+                                curr_trans['gaze_positions']  = (curr_data[6:]) if curr_data[6]!='null' else float('nan')  
+                                curr_trans['img_dir'] = traj.strip('.txt')
 
-                            # start a new current trajectory if next epiosde begins
-                            # save traj number beginning from 0 for these initial episodes
-                            if(curr_trans['episode']!=last_episode):
-                                extra_episode_num = int(traj.split('_')[0]
-                                while extra_episode_num in valid_trial_nums:
-                                    extra_episode_num = np.randint(0)
-                                trajectories[game][extra_episode_num] = curr_traj
-                                curr_traj = []
-                                extra_episodes += 1
-                            else:
-                                curr_traj.append(curr_trans)
-                            last_episode = curr_trans['episode'] 
+                                # start a new current trajectory if next epiosde begins
+                                # save traj number beginning from 0 for these initial episodes
+                                if(curr_trans['episode']!=last_episode and not math.isnan(curr_trans['episode'])):
+                                    print(curr_trans['episode'])
+                                    extra_episode_num = int(traj.split('_')[0])
+                                    print(extra_episode_num, valid_trial_nums)
+                                    while(extra_episode_num in valid_trial_nums):
+                                        print('randomly sampling a trial number for extra episodes in a trajectory')
+                                        extra_episode_num = np.random.randint(0,1000)
+                                    trajectories[game][extra_episode_num] = curr_traj
+                                    curr_traj = []
+                                    # extra_episodes += 1
+                                else:
+                                    curr_traj.append(curr_trans)
+                                last_episode = curr_trans['episode'] 
                 trajectories[game][int(traj.split('_')[0])] = curr_traj
         return trajectories

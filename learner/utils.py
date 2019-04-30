@@ -43,11 +43,16 @@ def MaxSkipAndWarpFrames(trajectory_dir):
     max_frames = []
     for i in range(num_frames):
         #TODO: check that i should max before warping.
+        b = trajectory_dir.split("_")
+        img_name =  "_".join(b[1:3]) + "_" + str(i) + ".png"
         if i % skip == skip - 2:
-            obs = cv2.imread(path.join(trajectory_dir, str(i) + ".png"))
+            # print(path.join(trajectory_dir, img_name))
+            obs = cv2.imread(path.join(trajectory_dir, img_name))
+            # print(type(obs))
             obs_buffer[0] = obs
         if i % skip == skip - 1:
-            obs = cv2.imread(path.join(trajectory_dir, str(i) + ".png"))
+            # print(path.join(trajectory_dir, img_name))
+            obs = cv2.imread(path.join(trajectory_dir, img_name))
             obs_buffer[1] = obs
             #warp max to 80x80 grayscale
             image = obs_buffer.max(axis=0)
@@ -146,17 +151,20 @@ def get_sorted_traj_indices(env_name, dataset):
     #Note, I'm also going to try only keeping the full demonstrations that end in terminal
     traj_indices = []
     traj_scores = []
+    traj_dirs = []
     for t in dataset.trajectories[g]:
-        if env_name == "revenge":
-            traj_indices.append(t)
-            traj_scores.append(dataset.trajectories[g][t][-1]['score'])
+        # if env_name == "revenge":
+        #     traj_indices.append(t)
+        #     traj_scores.append(dataset.trajectories[g][t][-1]['score'])
 
-        elif dataset.trajectories[g][t][-1]['terminal']:
-            traj_indices.append(t)
-            traj_scores.append(dataset.trajectories[g][t][-1]['score'])
+        # elif dataset.trajectories[g][t][-1]['terminal']:
+        traj_indices.append(t)
+        traj_scores.append(dataset.trajectories[g][t][-1]['score'])
+        traj_dirs.append(dataset.trajectories[g][t][-1]['img_dir'])
 
     sorted_traj_indices = [x for _, x in sorted(zip(traj_scores, traj_indices), key=lambda pair: pair[0])]
     sorted_traj_scores = sorted(traj_scores)
+    sorted_traj_dirs = [x for _, x in sorted(zip(traj_scores, traj_dirs), key=lambda pair: pair[0])]
 
     print(sorted_traj_scores)
     #print(len(sorted_traj_scores))
@@ -166,10 +174,10 @@ def get_sorted_traj_indices(env_name, dataset):
     #so how do we want to get demos? how many do we have if we remove duplicates?
     seen_scores = set()
     non_duplicates = []
-    for i,s in zip(sorted_traj_indices, sorted_traj_scores):
+    for i,s,d in zip(sorted_traj_indices, sorted_traj_scores, sorted_traj_dirs):
         if s not in seen_scores:
             seen_scores.add(s)
-            non_duplicates.append((i,s))
+            non_duplicates.append((i,s,d))
     print("num non duplicate scores", len(seen_scores))
     if env_name == "spaceinvaders":
         start = 0
@@ -192,7 +200,7 @@ def get_sorted_traj_indices(env_name, dataset):
     return demos
 
 
-def get_preprocessed_trajectories(env_name, dataset):
+def get_preprocessed_trajectories(env_name, dataset, data_dir):
     """returns an array of trajectories corresponding to what you would get running checkpoints from PPO
        demonstrations are grayscaled, maxpooled, stacks of 4 with normalized values between 0 and 1 and
        top section of screen is masked
@@ -207,9 +215,10 @@ def get_preprocessed_trajectories(env_name, dataset):
     demos = get_sorted_traj_indices(env_name, dataset)
     human_scores = []
     human_demos = []
-    for indx, score in demos:
+    for indx, score, img_dir in demos:
         human_scores.append(score)
-        traj_dir = path.join(data_dir, 'screens', env_name, str(indx))
+        # traj_dir = path.join(data_dir, 'screens', env_name, str(indx))
+        traj_dir = path.join(data_dir, env_name, img_dir)
         #print("generating traj from", traj_dir)
         maxed_traj = MaxSkipAndWarpFrames(traj_dir)
         stacked_traj = StackFrames(maxed_traj)

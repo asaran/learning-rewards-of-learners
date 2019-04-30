@@ -30,7 +30,7 @@ import utils
 def create_training_data(demonstrations, returns, n_train):
     training_obs = []
     training_labels = []
-    training_gaze = []
+    # training_gaze = []
     num_demos = len(demonstrations)
     for n in range(n_train):
         ti = 0
@@ -53,6 +53,7 @@ def create_training_data(demonstrations, returns, n_train):
             traj_j = demonstrations[tj][tj_start:tj_start+snippet_length]
 
             # print(returns[ti][ti_start:ti_start+snippet_length])
+            print((returns[ti]))
             r_i = sum(returns[ti][ti_start:ti_start+snippet_length])
             r_j = sum(returns[tj][tj_start:tj_start+snippet_length])
 
@@ -69,9 +70,9 @@ def create_training_data(demonstrations, returns, n_train):
         #TODO: maybe add indifferent label?
         training_obs.append((traj_i, traj_j))
         training_labels.append(label)
-        training_gaze.append((gaze_i, gaze_j))
+        # training_gaze.append((gaze_i, gaze_j))
 
-    return training_obs, training_labels, training_gaze
+    return training_obs, training_labels#, training_gaze
 
 
 
@@ -278,7 +279,7 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
             # gaze_loss = (gaze_loss_i + gaze_loss_j)
             output_loss = loss_criterion(outputs, labels)
             print('output loss: ', output_loss)
-            print('gaze loss: ', gaze_loss)
+            # print('gaze loss: ', gaze_loss)
             # loss = output_loss + l1_reg * abs_rewards + gaze_reg * gaze_loss
             loss = output_loss + l1_reg * abs_rewards
 
@@ -324,10 +325,6 @@ def calc_accuracy(reward_network, training_inputs, training_outputs):
             if pred_label.item() == label:
                 num_correct += 1.
     return num_correct / len(training_inputs)
-
-
-
-
 
 
 def predict_reward_sequence(net, traj):
@@ -411,7 +408,6 @@ if __name__=="__main__":
                            'episode_life':False,
                        })
 
-
     env = VecFrameStack(env, 4)
     agent = PPO2Agent(env, env_type, stochastic)
 
@@ -419,7 +415,7 @@ if __name__=="__main__":
     # dataset = ds.AtariDataset(data_dir)
     # demonstrations, learning_returns = agc_demos.get_preprocessed_trajectories(agc_env_name, dataset, data_dir)
     dataset = ahd.AtariHeadDataset(env_name, data_dir)
-    demonstrations, learning_returns = utils.get_preprocessed_trajectories(env_name, dataset)
+    demonstrations, learning_returns = utils.get_preprocessed_trajectories(env_name, dataset, data_dir)
     # demonstrations, learning_returns, gaze_maps = get_atari_head_demos(env_name, data_dir)
 
 
@@ -451,6 +447,7 @@ if __name__=="__main__":
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     reward_net = Net()
     reward_net.to(device)
+
     import torch.optim as optim
     optimizer = optim.Adam(reward_net.parameters(),  lr=lr, weight_decay=weight_decay)
     learn_reward(reward_net, optimizer, training_obs, training_labels,  num_iter, l1_reg, args.reward_model_path)
