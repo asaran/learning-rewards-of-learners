@@ -227,7 +227,7 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, t
             if i % 500 == 499:
                 #print(i)
                 print("epoch {}:{} loss {}".format(epoch,i, cum_loss))
-                print(abs_rewards)
+                #print(abs_rewards)
                 cum_loss = 0.0
                 print("check pointing")
                 torch.save(reward_net.state_dict(), checkpoint_dir)
@@ -295,7 +295,7 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
             if i % 500 == 499:
                 #print(i)
                 print("epoch {}:{} loss {}".format(epoch,i, cum_loss))
-                print(abs_rewards)
+                #print(abs_rewards)
                 cum_loss = 0.0
                 print("check pointing")
                 torch.save(reward_net.state_dict(), checkpoint_dir+"/"+str(i)+'.pth')

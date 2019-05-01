@@ -169,7 +169,7 @@ def get_sorted_traj_indices(env_name, dataset):
     sorted_traj_dirs = [x for _, x in sorted(zip(traj_scores, traj_dirs), key=lambda pair: pair[0])]
     sorted_traj_rewards = [x for _, x in sorted(zip(traj_scores, traj_rewards), key=lambda pair: pair[0])]
 
-    print(sorted_traj_scores)
+    #print(sorted_traj_scores)
     #print(len(sorted_traj_scores))
     print("Max human score", max(sorted_traj_scores))
     print("Min human score", min(sorted_traj_scores))
@@ -199,7 +199,7 @@ def get_sorted_traj_indices(env_name, dataset):
         skip = 3
     num_demos = 12
     demos = non_duplicates[start:num_demos*skip + start:skip]
-    print("(index, score) pairs:",demos)
+    #print("(index, score) pairs:",demos)
     return demos
 
 
