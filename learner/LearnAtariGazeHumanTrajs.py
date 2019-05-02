@@ -458,7 +458,7 @@ if __name__=="__main__":
     with torch.no_grad():
         pred_returns = [predict_traj_return(reward_net, traj) for traj in demonstrations]
     for i, p in enumerate(pred_returns):
-        print(i,p,sum(learning_returns[i]))
+        print(i,p,sum(learning_rewards[i]),learning_returns[i])
 
     print("accuracy", calc_accuracy(reward_net, training_obs, training_labels))
 
