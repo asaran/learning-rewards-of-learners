@@ -52,8 +52,8 @@ def evaluate_learned_policy(env_name, checkpoint, rep):
     learning_returns = []
     # model_path = "/scratch/cluster/dsbrown/tflogs/" + env_name + "20env_" + str(rep) + "/checkpoints/" + checkpoint
     # model_path = "/home/dsbrown/Code/learning-rewards-of-learners/learner/models/spaceinvaders/checkpoints/" + checkpoint
-    model_path = '/home/akanksha/learning-rewards-of-learners/path_to_logs/hero/checkpoints/'+checkpoint
-    # model_path = '/scratch/cluster/asaran/learning-rewards-of-learners/learner/learned_models/'+checkpoint
+    #model_path = '/home/akanksha/learning-rewards-of-learners/path_to_logs/hero/checkpoints/'+checkpoint
+    model_path = '/scratch/cluster/asaran/learning-rewards-of-learners/learner/path_to_logs/'+checkpoint
     print(model_path)
 
     agent.load(model_path)
@@ -114,7 +114,8 @@ if __name__=="__main__":
     print("*"*10)
     returns = evaluate_learned_policy(env_name, checkpoint, rep)
     #write returns to file
-    f = open("./eval/" + env_name + "_" + checkpoint + "_" + "eval.txt",'w')
+    #f = open("./eval/" + env_name + "_" + checkpoint + "_" + "eval.txt",'w')
+    f = open("./eval/" + checkpoint.split('/')[0] + "_" + "eval.txt",'w')
     for r in returns:
         f.write("{}\n".format(r))
     f.close()

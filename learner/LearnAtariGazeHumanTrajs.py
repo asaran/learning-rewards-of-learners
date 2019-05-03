@@ -350,6 +350,7 @@ if __name__=="__main__":
     parser.add_argument('--seed', default=0, help="random seed for experiments")
     parser.add_argument('--data_dir', help="where atari-head data is located")
     parser.add_argument('--use_gaze', default=False, help="where atari-head data is located")
+    parser.add_argument('--snippet_len', default=50, help="snippet lengths of trajectories used for training")
 
     args = parser.parse_args()
     env_name = args.env_name
@@ -396,7 +397,7 @@ if __name__=="__main__":
 
     print("Training reward for", env_id)
     n_train = 10000 #number of pairs of trajectories to create
-    snippet_length = 500 #length of trajectory for training comparison
+    snippet_length = args.snippet_len #length of trajectory for training comparison
     lr = 0.0001
     weight_decay = 0.0
     num_iter = 5 #num times through training data
