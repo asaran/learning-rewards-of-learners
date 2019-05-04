@@ -397,7 +397,7 @@ if __name__=="__main__":
 
     print("Training reward for", env_id)
     n_train = 10000 #number of pairs of trajectories to create
-    snippet_length = args.snippet_len #length of trajectory for training comparison
+    snippet_length = int(args.snippet_len) #length of trajectory for training comparison
     lr = 0.0001
     weight_decay = 0.0
     num_iter = 5 #num times through training data
