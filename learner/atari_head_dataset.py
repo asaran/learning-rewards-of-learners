@@ -105,8 +105,9 @@ class AtariHeadDataset():
                                 curr_trans['score']    = int(curr_data[2])  
                                 curr_trans['duration'] = int(curr_data[3]) if curr_data[3]!='null' else float('nan')     
                                 curr_trans['reward']   = int(curr_data[4]) if curr_data[4]!='null' else float('nan')     
-                                curr_trans['action']   = int(curr_data[5]) if curr_data[5]!='null' else float('nan')     
-                                curr_trans['gaze_positions']  = (curr_data[6:]) if curr_data[6]!='null' else float('nan')  
+                                curr_trans['action']   = int(curr_data[5]) if curr_data[5]!='null' else float('nan')  
+                                # print(curr_data[6:])   
+                                curr_trans['gaze_positions']  = ([float(gp) for gp in curr_data[6:]]) if curr_data[6]!='null' else float('nan')  
                                 curr_trans['img_dir'] = traj.strip('.txt')
 
                                 # start a new current trajectory if next epiosde begins
