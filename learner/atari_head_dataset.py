@@ -98,7 +98,7 @@ class AtariHeadDataset():
                             curr_data = line.rstrip('\n').split(',')
                             
                             # curr_data = line.rstrip('\n').replace(" ","").split(',')
-                            if curr_data[2]!='null':
+                            if curr_data[2]!='null':    # skipping the frames with a NULL score
                                 curr_trans = {}
                                 curr_trans['frame']    = (curr_data[0])
                                 curr_trans['episode']  = int(curr_data[1]) if curr_data[1]!='null' else float('nan')                       

@@ -34,9 +34,11 @@ def GrayScaleWarpImage(image):
     #frame = np.expand_dims(frame, -1)
     return frame
 
-def MaxSkipAndWarpFrames(trajectory_dir):
+def MaxSkipAndWarpFrames(trajectory_dir, frames):
     """take a trajectory file of frames and max over every 3rd and 4th observation"""
-    num_frames = len(listdir(trajectory_dir))
+    # num_frames = len(listdir(trajectory_dir))
+    num_frames = len(frames)
+    # print('total images:', num_frames)
     skip=4
 
     sample_pic = np.random.choice(listdir(trajectory_dir))
@@ -46,8 +48,9 @@ def MaxSkipAndWarpFrames(trajectory_dir):
     max_frames = []
     for i in range(num_frames):
         #TODO: check that i should max before warping.
-        b = trajectory_dir.split("_")
-        img_name =  "_".join(b[1:3]) + "_" + str(i) + ".png"
+        # b = trajectory_dir.split("_")
+        # img_name =  "_".join(b[1:3]) + "_" + str(i) + ".png"
+        img_name = frames[i] + ".png"
 
         if i % skip == skip - 2:
             # print(path.join(trajectory_dir, img_name))
@@ -67,7 +70,7 @@ def MaxSkipAndWarpFrames(trajectory_dir):
             image = obs_buffer.max(axis=0)
             warped = GrayScaleWarpImage(image)
             max_frames.append(warped)
-
+    # print('num img frames: ', len(max_frames))
     return max_frames
 
 def StackFrames(frames):
@@ -124,6 +127,7 @@ def CreateGazeMap(gaze_coords, pic):
 def MaxSkipGaze(gaze,  trajectory_dir):
     """take a list of gaze coordinates and max over every 3rd and 4th observation"""
     num_frames = len(gaze)
+    # print('total gaze items: ', num_frames)
     skip=4
     width, height = 84, 84
     sample_pic = np.random.choice(listdir(trajectory_dir))
@@ -143,6 +147,7 @@ def MaxSkipGaze(gaze,  trajectory_dir):
             obs_buffer[1] = obs
             image = obs_buffer.max(axis=0)
             max_frames.append(image)
+    # print('num gaze frames: ', len(max_frames))
     return max_frames
 
 def StackGaze(gaze_frames):
@@ -166,11 +171,41 @@ def StackGaze(gaze_frames):
             stacked.append(np.expand_dims(copy.deepcopy(stacked_obs),0))
     return stacked
 
-def MaxSkipReward(reward):
-    return
+def MaxSkipReward(rewards):
+    """take a list of rewards and max over every 3rd and 4th observation"""
+    num_frames = len(rewards)
+    skip=4
+    max_frames = []
+    obs_buffer = np.zeros((2,))
+    for i in range(num_frames):
+        r = rewards[i]
+        if i % skip == skip - 2:
+            
+            obs_buffer[0] = r
+        if i % skip == skip - 1:
+            
+            obs_buffer[1] = r
+            rew = obs_buffer.max(axis=0)
+            max_frames.append(rew)
+    # print('num reward frames: ', len(max_frames))
+    return max_frames
 
-def StackReward(reward):
-    return
+
+def StackReward(rewards):
+    import copy
+    """combine every four frames to make an observation"""
+    stacked = []
+    stacked_obs = np.zeros((1,))
+    for i in range(len(rewards)):
+        if i >= 3:
+            # SUm over the rewards across four frames
+            stacked_obs = rewards[i-3]
+            stacked_obs = stacked_obs + rewards[i-2]
+            stacked_obs = stacked_obs + rewards[i-1]
+            stacked_obs = stacked_obs + rewards[i]
+
+            stacked.append(np.expand_dims(copy.deepcopy(stacked_obs),0))
+    return stacked
 
 def get_sorted_traj_indices(env_name, dataset):
     #need to pick out a subset of demonstrations based on desired performance
@@ -183,6 +218,7 @@ def get_sorted_traj_indices(env_name, dataset):
     traj_dirs = []
     traj_rewards = []
     traj_gaze = []
+    traj_frames = []
     print('traj length: ',len(dataset.trajectories[g]))
     for t in dataset.trajectories[g]:
         # if env_name == "revenge":
@@ -195,6 +231,7 @@ def get_sorted_traj_indices(env_name, dataset):
         traj_dirs.append(dataset.trajectories[g][t][-1]['img_dir'])
         traj_rewards.append([dataset.trajectories[g][t][i]['reward'] for i in range(len(dataset.trajectories[g][t]))])
         traj_gaze.append([dataset.trajectories[g][t][i]['gaze_positions'] for i in range(len(dataset.trajectories[g][t]))])
+        traj_frames.append([dataset.trajectories[g][t][i]['frame'] for i in range(len(dataset.trajectories[g][t]))])
         # print(dataset.trajectories[g][t][0]['gaze_positions'])
 
     sorted_traj_indices = [x for _, x in sorted(zip(traj_scores, traj_indices), key=lambda pair: pair[0])]
@@ -202,6 +239,7 @@ def get_sorted_traj_indices(env_name, dataset):
     sorted_traj_dirs = [x for _, x in sorted(zip(traj_scores, traj_dirs), key=lambda pair: pair[0])]
     sorted_traj_rewards = [x for _, x in sorted(zip(traj_scores, traj_rewards), key=lambda pair: pair[0])]
     sorted_traj_gaze = [x for _, x in sorted(zip(traj_scores, traj_gaze), key=lambda pair: pair[0])]
+    sorted_traj_frames = [x for _, x in sorted(zip(traj_scores, traj_frames), key=lambda pair: pair[0])]
 
     #print(sorted_traj_scores)
     #print(len(sorted_traj_scores))
@@ -213,11 +251,11 @@ def get_sorted_traj_indices(env_name, dataset):
     #so how do we want to get demos? how many do we have if we remove duplicates?
     seen_scores = set()
     non_duplicates = []
-    for i,s,d,r,g in zip(sorted_traj_indices, sorted_traj_scores, sorted_traj_dirs, sorted_traj_rewards, sorted_traj_gaze):
+    for i,s,d,r,g,f in zip(sorted_traj_indices, sorted_traj_scores, sorted_traj_dirs, sorted_traj_rewards, sorted_traj_gaze, sorted_traj_frames):
         # print('s: ',s)
         if s not in seen_scores:
             seen_scores.add(s)
-            non_duplicates.append((i,s,d,r,g))
+            non_duplicates.append((i,s,d,r,g,f))
     print("num non duplicate scores", len(seen_scores))
     if env_name == "spaceinvaders":
         start = 0
@@ -257,15 +295,16 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir):
     human_demos = []
     human_rewards = []
     human_gaze = []
+    img_frames = []
     print('len demos: ',len(demos))
-    for indx, score, img_dir, rew, gaze in demos:
+    for indx, score, img_dir, rew, gaze, frame in demos:
         human_scores.append(score)
-        human_rewards.append(rew)
+        # human_rewards.append(rew)
         # human_gaze.append(gaze)
         # traj_dir = path.join(data_dir, 'screens', env_name, str(indx))
         traj_dir = path.join(data_dir, env_name, img_dir)
         #print("generating traj from", traj_dir)
-        maxed_traj = MaxSkipAndWarpFrames(traj_dir)
+        maxed_traj = MaxSkipAndWarpFrames(traj_dir, frame)
         stacked_traj = StackFrames(maxed_traj)
 
         # skip and stack gaze
@@ -283,8 +322,9 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir):
             demo_norm_mask.append(normalize_state(ob))  # currently not cropping
         human_demos.append(demo_norm_mask)
         human_gaze.append(stacked_gaze)
+        human_rewards.append(stacked_reward)
     print(len(human_demos[0]), len(human_rewards[0]), len(human_gaze[0]))
-    return human_demos, human_scores, human_rewards, human_gaze
+    return human_demos, human_scores, human_rewards, human_gaze, img_frames
 
 
 def read_gaze_file(game_file):
