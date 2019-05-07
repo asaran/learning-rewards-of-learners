@@ -9,6 +9,9 @@ cv2.ocl.setUseOpenCL(False)
 def normalize_state(obs):
     return obs / 255.0
 
+def normalize(obs, max_val):
+    return obs/float(max_val)
+
 def mask_score(obs, crop_top = True):
     if crop_top:
         #takes a stack of four observations and blacks out (sets to zero) top n rows
@@ -85,74 +88,89 @@ def StackFrames(frames):
             stacked.append(np.expand_dims(copy.deepcopy(stacked_obs),0))
     return stacked
 
-def get_atari_head_demos(env_name, data_dir):
-    print('env name: ', env_name)
-    # read the meta data csv file
-    trial_nums = []
-    with open(data_dir+'meta_data.csv') as csv_file:
-        csv_reader = csv.reader(csv_file, delimiter=',')
-        line_count = 0
-        for row in csv_reader:
-            if line_count == 0:
-                line_count += 1
-            else:
-                game_name = row[0].lower()
-                if game_name==env_name:
-                    trial_nums.append(row[1])
-                line_count += 1
 
-    d = data_dir+'/'+env_name
-    trials = [o for o in os.listdir(d) 
-                        if os.path.isdir(os.path.join(d,o))]
+def CreateGazeMap(gaze_coords, pic):
+    import math
+    w, h = 84, 84
+    old_h, old_w = pic.shape[0], pic.shape[1]
+    obs = np.zeros((w, h))
+    # print(gaze_coords)
+    gaze_freq = {}
+    if(not np.isnan(gaze_coords).all()):      
+        for j in range(0,len(gaze_coords),2):
+            if(not np.isnan(gaze_coords[j]) and not np.isnan(gaze_coords[j+1])):
+                x = (gaze_coords[j])*w/old_w
+                y = (gaze_coords[j+1])*h/old_h
+                # print('orig size: ',old_w,old_h)
+                # print('gaze_coords:',gaze_coords[j], gaze_coords[j+1])
+                # print('coords for 84x84: ',x,y)
+                x, y = min(int(x),w-1), min(int(y),h-1)
+                # print('int',x,y)
+                if (x,y) not in gaze_freq:
+                    gaze_freq[(x,y)] = 1
+                else:
+                    gaze_freq[(x,y)] += 1
+    
+    # Create the gaze mask based on how frequently a coordinate is fixated upon
+    for coords in gaze_freq:
+        x, y = coords
+        # print(x)
+        obs[y,x] = gaze_freq[coords]
 
-    # trajectory folder names for the chosen game
-    valid_trials = [t for t in trials if t.split('_')[0] in trial_nums]
+    
+    
+    return obs
 
-    print('valid trials:', valid_trials)
-    # accumulate stacks of 4 frames along the trajectory with an associated return of the 4th frame
-    # TODO: check for episode number, separate trajectories by episodes
-    trajectories = []
-    returns = []
-    gaze_maps = []
-    for t in valid_trials:
-        traj = []
-        r = []
-        gaze = []
-        img_dir = data_dir+'/'+env_name+'/'+t
-        game_file = data_dir+'/'+env_name+'/'+t+'.txt'        
-        lines = read_gaze_file(game_file)
-        img_paths = [os.path.join(img_dir, o) for o in os.listdir(img_dir)]
-        # print(img_paths)
+def MaxSkipGaze(gaze,  trajectory_dir):
+    """take a list of gaze coordinates and max over every 3rd and 4th observation"""
+    num_frames = len(gaze)
+    skip=4
+    width, height = 84, 84
+    sample_pic = np.random.choice(listdir(trajectory_dir))
+    image_path = path.join(trajectory_dir, sample_pic)
+    pic = cv2.imread(image_path)
+    pic_small = cv2.resize(pic, (width, height), interpolation=cv2.INTER_AREA)
+    pic_small = cv2.cvtColor(pic_small, cv2.COLOR_BGR2GRAY)
+    obs_buffer = np.zeros((2,)+pic_small.shape, dtype=np.uint8)
+    max_frames = []
+    for i in range(num_frames):
+        g = gaze[i]
+        if i % skip == skip - 2:
+            obs = CreateGazeMap(g, pic)
+            obs_buffer[0] = obs
+        if i % skip == skip - 1:
+            obs = CreateGazeMap(g, pic)
+            obs_buffer[1] = obs
+            image = obs_buffer.max(axis=0)
+            max_frames.append(image)
+    return max_frames
 
-        for p in range(3,len(img_paths)):
-            line = lines[p].split(',')
-            imgs = [cv2.imread(img_paths[p-i]) for i in range(3,-1,-1)]
-            im_gray = [cv2.cvtColor(im, cv2.COLOR_BGR2GRAY) for im in imgs]
-            # print(im_gray[0].shape)
-            im_gray = [cv2.resize(im,(84,84)) for im in im_gray]
-            imgs_stacked = np.stack(im_gray,2)
-            imgs_stacked = np.expand_dims(imgs_stacked, axis=0)
-            # imgs_stacked = torch.FloatTensor(imgs_stacked)
-            # imgs_stacked = imgs_stacked.unsqueeze(0)
-            # print(imgs_stacked.shape)
-            traj.append(imgs_stacked)
+def StackGaze(gaze_frames):
+    import copy
+    """combine every four frames to make an observation (84,84)"""
+    stacked = []
+    stacked_obs = np.zeros((84,84))
+    for i in range(len(gaze_frames)):
+        if i >= 3:
+            # SUm over the gaze frequency counts across four frames
+            stacked_obs = gaze_frames[i-3]
+            stacked_obs = stacked_obs + gaze_frames[i-2]
+            stacked_obs = stacked_obs + gaze_frames[i-1]
+            stacked_obs = stacked_obs + gaze_frames[i]
 
-            if line[4]!='null':
-                r.append(float(line[4])) # unclipped reward of 4th frame
-            else:
-                r.append(0)
-            
-            gaze_points = line[6:]
-            gaze_map = generate_gaze_map(gaze_points, imgs[0].shape)
-            gaze.append(gaze_map)
+            # Normalize the gaze mask
+            # print(stacked_obs.shape)
+            max_gaze_freq = np.amax(stacked_obs)
+            stacked_obs = normalize(stacked_obs, max_gaze_freq)
 
-        trajectories.append(traj)
-        returns.append(r)
-        gaze_maps.append(gaze)
+            stacked.append(np.expand_dims(copy.deepcopy(stacked_obs),0))
+    return stacked
 
-    # return lists of associated partial trajectories and returns
-    return trajectories, returns, gaze_maps
+def MaxSkipReward(reward):
+    return
 
+def StackReward(reward):
+    return
 
 def get_sorted_traj_indices(env_name, dataset):
     #need to pick out a subset of demonstrations based on desired performance
@@ -243,16 +261,20 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir):
     for indx, score, img_dir, rew, gaze in demos:
         human_scores.append(score)
         human_rewards.append(rew)
-        human_gaze.append(gaze)
+        # human_gaze.append(gaze)
         # traj_dir = path.join(data_dir, 'screens', env_name, str(indx))
         traj_dir = path.join(data_dir, env_name, img_dir)
         #print("generating traj from", traj_dir)
         maxed_traj = MaxSkipAndWarpFrames(traj_dir)
         stacked_traj = StackFrames(maxed_traj)
 
-
         # skip and stack gaze
+        maxed_gaze = MaxSkipGaze(gaze, traj_dir)
+        stacked_gaze = StackGaze(maxed_gaze)
+
         # skip and stack reward
+        maxed_reward = MaxSkipReward(rew)
+        stacked_reward = StackReward(maxed_reward)
 
         demo_norm_mask = []
         #normalize values to be between 0 and 1 and have top part masked
@@ -260,6 +282,8 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir):
             # demo_norm_mask.append(mask_score(normalize_state(ob), crop_top))
             demo_norm_mask.append(normalize_state(ob))  # currently not cropping
         human_demos.append(demo_norm_mask)
+        human_gaze.append(stacked_gaze)
+    print(len(human_demos[0]), len(human_rewards[0]), len(human_gaze[0]))
     return human_demos, human_scores, human_rewards, human_gaze
 
 
@@ -296,3 +320,72 @@ def generate_gaze_map(gaze, img_shape):
 
     # threshold values for a binary map
     return gaze_map
+
+
+def get_atari_head_demos(env_name, data_dir):
+    print('env name: ', env_name)
+    # read the meta data csv file
+    trial_nums = []
+    with open(data_dir+'meta_data.csv') as csv_file:
+        csv_reader = csv.reader(csv_file, delimiter=',')
+        line_count = 0
+        for row in csv_reader:
+            if line_count == 0:
+                line_count += 1
+            else:
+                game_name = row[0].lower()
+                if game_name==env_name:
+                    trial_nums.append(row[1])
+                line_count += 1
+
+    d = data_dir+'/'+env_name
+    trials = [o for o in os.listdir(d) 
+                        if os.path.isdir(os.path.join(d,o))]
+
+    # trajectory folder names for the chosen game
+    valid_trials = [t for t in trials if t.split('_')[0] in trial_nums]
+
+    print('valid trials:', valid_trials)
+    # accumulate stacks of 4 frames along the trajectory with an associated return of the 4th frame
+    # TODO: check for episode number, separate trajectories by episodes
+    trajectories = []
+    returns = []
+    gaze_maps = []
+    for t in valid_trials:
+        traj = []
+        r = []
+        gaze = []
+        img_dir = data_dir+'/'+env_name+'/'+t
+        game_file = data_dir+'/'+env_name+'/'+t+'.txt'        
+        lines = read_gaze_file(game_file)
+        img_paths = [os.path.join(img_dir, o) for o in os.listdir(img_dir)]
+        # print(img_paths)
+
+        for p in range(3,len(img_paths)):
+            line = lines[p].split(',')
+            imgs = [cv2.imread(img_paths[p-i]) for i in range(3,-1,-1)]
+            im_gray = [cv2.cvtColor(im, cv2.COLOR_BGR2GRAY) for im in imgs]
+            # print(im_gray[0].shape)
+            im_gray = [cv2.resize(im,(84,84)) for im in im_gray]
+            imgs_stacked = np.stack(im_gray,2)
+            imgs_stacked = np.expand_dims(imgs_stacked, axis=0)
+            # imgs_stacked = torch.FloatTensor(imgs_stacked)
+            # imgs_stacked = imgs_stacked.unsqueeze(0)
+            # print(imgs_stacked.shape)
+            traj.append(imgs_stacked)
+
+            if line[4]!='null':
+                r.append(float(line[4])) # unclipped reward of 4th frame
+            else:
+                r.append(0)
+            
+            gaze_points = line[6:]
+            gaze_map = generate_gaze_map(gaze_points, imgs[0].shape)
+            gaze.append(gaze_map)
+
+        trajectories.append(traj)
+        returns.append(r)
+        gaze_maps.append(gaze)
+
+    # return lists of associated partial trajectories and returns
+    return trajectories, returns, gaze_maps
