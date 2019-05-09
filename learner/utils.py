@@ -232,7 +232,6 @@ def get_sorted_traj_indices(env_name, dataset):
         traj_rewards.append([dataset.trajectories[g][t][i]['reward'] for i in range(len(dataset.trajectories[g][t]))])
         traj_gaze.append([dataset.trajectories[g][t][i]['gaze_positions'] for i in range(len(dataset.trajectories[g][t]))])
         traj_frames.append([dataset.trajectories[g][t][i]['frame'] for i in range(len(dataset.trajectories[g][t]))])
-        # print(dataset.trajectories[g][t][0]['gaze_positions'])
 
     sorted_traj_indices = [x for _, x in sorted(zip(traj_scores, traj_indices), key=lambda pair: pair[0])]
     sorted_traj_scores = sorted(traj_scores)
@@ -312,20 +311,19 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze):
             demo_norm_mask.append(normalize_state(ob))  # currently not cropping
         human_demos.append(demo_norm_mask)
 
+        # skip and stack reward
+        maxed_reward = MaxSkipReward(rew)
+        stacked_reward = StackReward(maxed_reward)      
+        human_rewards.append(stacked_reward)
+
         if(use_gaze):
             # skip and stack gaze
             maxed_gaze = MaxSkipGaze(gaze, traj_dir)
             stacked_gaze = StackGaze(maxed_gaze)
-
             human_gaze.append(stacked_gaze)
 
-        # skip and stack reward
-        maxed_reward = MaxSkipReward(rew)
-        stacked_reward = StackReward(maxed_reward)
-      
-        human_rewards.append(stacked_reward)
-
-    print(len(human_demos[0]), len(human_rewards[0]), len(human_gaze[0]))
+    if(use_gaze):    
+        print(len(human_demos[0]), len(human_rewards[0]), len(human_gaze[0]))
     return human_demos, human_scores, human_rewards, human_gaze
 
 
