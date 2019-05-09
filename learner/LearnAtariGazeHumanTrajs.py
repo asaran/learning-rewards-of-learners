@@ -419,9 +419,7 @@ if __name__=="__main__":
     # dataset = ds.AtariDataset(data_dir)
     # demonstrations, learning_returns = agc_demos.get_preprocessed_trajectories(agc_env_name, dataset, data_dir)
     dataset = ahd.AtariHeadDataset(env_name, data_dir)
-    demonstrations, learning_returns, learning_rewards, _, _ = utils.get_preprocessed_trajectories(env_name, dataset, data_dir)
-    # demonstrations, learning_returns, gaze_maps = get_atari_head_demos(env_name, data_dir)
-
+    demonstrations, learning_returns, learning_rewards, _ = utils.get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze)
 
     # Let's plot the returns to see if they are roughly monotonically increasing.
     #plt.plot(learning_returns)
