@@ -27,19 +27,20 @@ import utils
 
 # Create training data by taking random 50 length crops of trajectories, computing the true returns and adding them to the training data with the correct label.
 # def create_training_data(demonstrations, returns, gaze_maps, n_train):
-def create_training_data(demonstrations, returns, rewards, n_train):
+def create_training_data(demonstrations, returns, rewards, gaze_maps, n_train, use_gaze):
     training_obs = []
     training_labels = []
-    # training_gaze = []
+    training_gaze = []
     num_demos = len(demonstrations)
     for n in range(n_train):
         ti, tj = 0, 0
         r_i, r_j = 0, 0   
         rew_i, rew_j = 0, 0
-
+        
         #only add trajectories that are different returns
         # while(ti == tj):
-        while(r_i == r_j):
+        # while(r_i == r_j):
+        while(rew_i == rew_j):
             #pick two random demonstrations
             ti = np.random.randint(num_demos)
             tj = np.random.randint(num_demos)
@@ -60,12 +61,14 @@ def create_training_data(demonstrations, returns, rewards, n_train):
             rew_i = sum(rewards[ti][ti_start:ti_start+snippet_length])
             rew_j = sum(rewards[tj][tj_start:tj_start+snippet_length])
 
-            # gaze_i = gaze_maps[ti][ti_start:ti_start+snippet_length]
-            # gaze_j = gaze_maps[tj][tj_start:tj_start+snippet_length]
+            if use_gaze:
+                gaze_i = gaze_maps[ti][ti_start:ti_start+snippet_length]
+                gaze_j = gaze_maps[tj][tj_start:tj_start+snippet_length]
 
 
         # labels will be created differently
-        if r_i > r_j:
+        # if r_i > r_j:
+        if rew_i > rew_j:
             label = 0
         else:
             label = 1
@@ -73,9 +76,10 @@ def create_training_data(demonstrations, returns, rewards, n_train):
         #TODO: maybe add indifferent label?
         training_obs.append((traj_i, traj_j))
         training_labels.append(label)
-        # training_gaze.append((gaze_i, gaze_j))
+        if use_gaze:
+            training_gaze.append((gaze_i, gaze_j))
 
-    return training_obs, training_labels#, training_gaze
+    return training_obs, training_labels, training_gaze
 
 
 
@@ -91,7 +95,6 @@ class Net(nn.Module):
         self.fc1 = nn.Linear(784, 64)
         #self.fc1 = nn.Linear(1936,64)
         self.fc2 = nn.Linear(64, 1)
-
 
 
     def cum_return(self, traj):
@@ -116,7 +119,6 @@ class Net(nn.Module):
         ##    sum_rewards += y
         #print(sum_rewards)
         return sum_rewards, sum_abs_rewards
-
 
 
     def forward(self, traj_i, traj_j):
@@ -159,12 +161,60 @@ class Net(nn.Module):
 
 # In[111]:
 
-def gaze_loss(true_gaze, conv_gaze):
+def gaze_loss_KL(true_gaze, conv_gaze):
     loss = F.kl_div(true_gaze, conv_gaze)
     return loss
 
+# wasserstein loss or Earth mover's distance
+def gaze_loss_EMD(true_gaze, conv_gaze):
+    from pyemd import emd, emd_samples
+    from scipy.stats import wasserstein_distance
 
-def learn_reward(reward_network, optimizer, training_inputs, training_outputs, training_gaze, num_iter, l1_reg, gaze_reg, checkpoint_dir, use_gaze):
+    # flatten input maps
+    maps = [img.ravel() for img in [true_gaze, conv_gaze]]
+
+    # compute EMD using values
+    d1 = emd_samples(maps[0], maps[1]) # 25.57794401220945
+    d2 = wasserstein_distance(maps[0], maps[1]) # 25.76187896728515
+
+    # compute EMD using distributions
+    # N_BINS = 256
+    # hists = [np.histogram(img, N_BINS, density=True)[0].astype(np.float64) for img in maps]
+
+    # mgrid = np.meshgrid(np.arange(N_BINS), np.arange(N_BINS))
+    # metric = np.abs(mgrid[0] - mgrid[1]).astype(np.float64)
+
+    # emd(hists[0], hists[1], metric) # 25.862491463680065
+
+    loss = d1
+    return loss
+
+# coverage based loss, only penalize if conv_gaze is not a superset of true_gaze
+def gaze_loss_coverage(true_gaze, conv_gaze):
+    true_gaze = true_gaze.cpu().detach().numpy()
+    conv_gaze = conv_gaze.cpu().detach().numpy()
+
+    print(type(true_gaze))
+    # flatten input maps
+    maps = [img.ravel() for img in [true_gaze, conv_gaze]]
+
+    # iterate over all coordinates of the true_gaze map
+    for i in range(len(maps[0])):
+        # compare pixel values between true and conv gaze map
+        # add penalty if difference between true_gaze and conv_gaze pixel values is greater than a threshold (0.5)
+        if abs(maps[0][i]-maps[1][i])>0.5:
+            loss+=abs(maps[0][i]-maps[1][i])
+
+    # normalize loss by batch size?
+
+    return loss
+
+
+def learn_reward(reward_network, optimizer, training_inputs, training_outputs, training_gaze, num_iter, l1_reg, checkpoint_dir, use_gaze):
+
+    # multiplier for gaze loss
+    gaze_reg = 0.5
+
     #check if gpu available
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     # Assume that we are on a CUDA machine, then this should print a CUDA device:
@@ -179,7 +229,7 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, t
         for i in range(len(training_labels)):
             traj_i, traj_j = training_obs[i]
             labels = np.array([[training_labels[i]]])
-            gaze_i, gaze_j = training_gaze[i]
+            
             # print(traj_i)
             traj_i = np.array(traj_i)
             traj_j = np.array(traj_j)
@@ -187,81 +237,7 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, t
             traj_j = torch.from_numpy(traj_j).float().to(device)
             labels = torch.from_numpy(labels).to(device)
 
-            gaze_i = np.array(gaze_i)
-            gaze_j = np.array(gaze_j)
-            gaze_i = torch.from_numpy(gaze_i).float().to(device)
-            gaze_j = torch.from_numpy(gaze_j).float().to(device)
-
-            #zero out gradient
-            optimizer.zero_grad()
-
-            #forward + backward + optimize
-            outputs, abs_rewards = reward_network.forward(traj_i, traj_j)
-            outputs = outputs.unsqueeze(0)
-            #print(outputs)
-            #print(labels)
-
-            # get conv map output
-            gaze_map_i = reward_network.conv_map(traj_i)
-            gaze_map_j = reward_network.conv_map(traj_j)
-            # print(gaze_map_i)
-            # print(gaze_map_j.shape)
-
-            if(not(use_gaze)):
-                loss = loss_criterion(outputs, labels) + l1_reg * abs_rewards
-            else:
-                gaze_loss_i = gaze_loss(gaze_i, gaze_map_i)
-                gaze_loss_j = gaze_loss(gaze_j, gaze_map_j)
-                gaze_loss = (gaze_loss_i + gaze_loss_j)
-                output_loss = loss_criterion(outputs, labels)
-                print('output loss: ', output_loss)
-                print('gaze loss: ', gaze_loss)
-                loss = output_loss + l1_reg * abs_rewards + gaze_reg * gaze_loss
-
-            loss.backward()
-            optimizer.step()
-
-            #print stats to see if learning
-            item_loss = loss.item()
-            cum_loss += item_loss
-            if i % 500 == 499:
-                #print(i)
-                print("epoch {}:{} loss {}".format(epoch,i, cum_loss))
-                #print(abs_rewards)
-                cum_loss = 0.0
-                print("check pointing")
-                torch.save(reward_net.state_dict(), checkpoint_dir)
-    print("finished training")
-
-
-def learn_reward(reward_network, optimizer, training_inputs, training_outputs, num_iter, l1_reg, checkpoint_dir):
-    #check if gpu available
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    # Assume that we are on a CUDA machine, then this should print a CUDA device:
-    print(device)
-    loss_criterion = nn.CrossEntropyLoss()
-    #print(training_data[0])
-    cum_loss = 0.0
-    training_data = list(zip(training_inputs, training_outputs))
-    for epoch in range(num_iter):
-        np.random.shuffle(training_data)
-        training_obs, training_labels = zip(*training_data)
-        for i in range(len(training_labels)):
-            traj_i, traj_j = training_obs[i]
-            labels = np.array([[training_labels[i]]])
-            # gaze_i, gaze_j = training_gaze[i]
-            # print(traj_i)
-            traj_i = np.array(traj_i)
-            traj_j = np.array(traj_j)
-            traj_i = torch.from_numpy(traj_i).float().to(device)
-            traj_j = torch.from_numpy(traj_j).float().to(device)
-            labels = torch.from_numpy(labels).to(device)
-
-            # gaze_i = np.array(gaze_i)
-            # gaze_j = np.array(gaze_j)
-            # gaze_i = torch.from_numpy(gaze_i).float().to(device)
-            # gaze_j = torch.from_numpy(gaze_j).float().to(device)
-
+            
             #zero out gradient
             optimizer.zero_grad()
 
@@ -269,22 +245,37 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
             outputs, abs_rewards = reward_network.forward(traj_i, traj_j)
             outputs = outputs.unsqueeze(0)
 
-            # get conv map output
-            # gaze_map_i = reward_network.conv_map(traj_i)
-            # gaze_map_j = reward_network.conv_map(traj_j)
-
-
-            # if(not(use_gaze)):
-            #     loss = loss_criterion(outputs, labels) + l1_reg * abs_rewards
-            # else:
-            # gaze_loss_i = gaze_loss(gaze_i, gaze_map_i)
-            # gaze_loss_j = gaze_loss(gaze_j, gaze_map_j)
-            # gaze_loss = (gaze_loss_i + gaze_loss_j)
             output_loss = loss_criterion(outputs, labels)
             print('output loss: ', output_loss)
-            # print('gaze loss: ', gaze_loss)
-            # loss = output_loss + l1_reg * abs_rewards + gaze_reg * gaze_loss
-            loss = output_loss + l1_reg * abs_rewards
+
+            if use_gaze:
+                # ground truth human gaze maps (7x7)
+                gaze_i, gaze_j = training_gaze[i]
+                
+                print(len(gaze_i[0]))
+                gaze_i = np.array(gaze_i)
+                gaze_j = np.array(gaze_j)
+                print('GT gaze map shape: ', gaze_i.shape)
+                gaze_i = torch.from_numpy(gaze_i).float().to(device)
+                gaze_j = torch.from_numpy(gaze_j).float().to(device)
+
+                # get normalized conv map output (7x7)
+                gaze_map_i = reward_network.conv_map(traj_i)
+                gaze_map_j = reward_network.conv_map(traj_j)
+                print('conv map shape: ', gaze_map_i.shape)
+
+                gaze_loss = gaze_loss_EMD
+                gaze_loss_i = gaze_loss(gaze_i, gaze_map_i)
+                gaze_loss_j = gaze_loss(gaze_j, gaze_map_j)
+
+                gaze_loss_total = (gaze_loss_i + gaze_loss_j)
+                print('gaze loss: ', gaze_loss_total)            
+            
+            if not use_gaze:
+                loss = output_loss + l1_reg * abs_rewards
+            else:
+                loss = output_loss + l1_reg * abs_rewards + gaze_reg * gaze_loss_total
+            print('total loss: ', loss)            
 
             loss.backward()
             optimizer.step()
@@ -419,7 +410,7 @@ if __name__=="__main__":
     # dataset = ds.AtariDataset(data_dir)
     # demonstrations, learning_returns = agc_demos.get_preprocessed_trajectories(agc_env_name, dataset, data_dir)
     dataset = ahd.AtariHeadDataset(env_name, data_dir)
-    demonstrations, learning_returns, learning_rewards, _ = utils.get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze)
+    demonstrations, learning_returns, learning_rewards, learning_gaze = utils.get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze)
 
     # Let's plot the returns to see if they are roughly monotonically increasing.
     #plt.plot(learning_returns)
@@ -442,7 +433,7 @@ if __name__=="__main__":
     #plt.show()
 
     # training_obs, training_labels, training_gaze = create_training_data(demonstrations, learning_returns, gaze_maps, n_train)
-    training_obs, training_labels = create_training_data(demonstrations, learning_returns, learning_rewards, n_train)
+    training_obs, training_labels, training_gaze = create_training_data(demonstrations, learning_returns, learning_rewards, learning_gaze, n_train, use_gaze)
     print("num training_obs", len(training_obs))
     print("num_labels", len(training_labels))
     # Now we create a reward network and optimize it using the training data.
@@ -452,7 +443,7 @@ if __name__=="__main__":
 
     import torch.optim as optim
     optimizer = optim.Adam(reward_net.parameters(),  lr=lr, weight_decay=weight_decay)
-    learn_reward(reward_net, optimizer, training_obs, training_labels,  num_iter, l1_reg, args.reward_model_path)
+    learn_reward(reward_net, optimizer, training_obs, training_labels, training_gaze, num_iter, l1_reg, args.reward_model_path, use_gaze)
 
     with torch.no_grad():
         pred_returns = [predict_traj_return(reward_net, traj) for traj in demonstrations]
