@@ -304,7 +304,7 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze):
         maxed_traj = MaxSkipAndWarpFrames(traj_dir, frame)
         stacked_traj = StackFrames(maxed_traj)
 
-         demo_norm_mask = []
+        demo_norm_mask = []
         #normalize values to be between 0 and 1 and have top part masked
         for ob in stacked_traj:
             # demo_norm_mask.append(mask_score(normalize_state(ob), crop_top))
