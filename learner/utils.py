@@ -94,7 +94,7 @@ def StackFrames(frames):
 
 def CreateGazeMap(gaze_coords, pic):
     import math
-    w, h = 84, 84
+    w, h = 7, 7
     old_h, old_w = pic.shape[0], pic.shape[1]
     obs = np.zeros((w, h))
     # print(gaze_coords)
@@ -129,7 +129,7 @@ def MaxSkipGaze(gaze,  trajectory_dir):
     num_frames = len(gaze)
     # print('total gaze items: ', num_frames)
     skip=4
-    width, height = 84, 84
+    width, height = 7,7
     sample_pic = np.random.choice(listdir(trajectory_dir))
     image_path = path.join(trajectory_dir, sample_pic)
     pic = cv2.imread(image_path)
@@ -154,10 +154,10 @@ def StackGaze(gaze_frames):
     import copy
     """combine every four frames to make an observation (84,84)"""
     stacked = []
-    stacked_obs = np.zeros((84,84))
+    stacked_obs = np.zeros((7,7))
     for i in range(len(gaze_frames)):
         if i >= 3:
-            # SUm over the gaze frequency counts across four frames
+            # Sum over the gaze frequency counts across four frames
             stacked_obs = gaze_frames[i-3]
             stacked_obs = stacked_obs + gaze_frames[i-2]
             stacked_obs = stacked_obs + gaze_frames[i-1]
