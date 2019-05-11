@@ -175,7 +175,7 @@ def gaze_loss_EMD(true_gaze, conv_gaze):
     from scipy.stats import wasserstein_distance
 
     # flatten input maps
-    print(type(true_gaze))
+    # print(type(true_gaze))
     maps = [img.ravel() for img in [true_gaze, conv_gaze]]
 
     # compute EMD using values
@@ -199,7 +199,7 @@ def gaze_loss_coverage(true_gaze, conv_gaze):
     true_gaze = true_gaze.cpu().detach().numpy()
     conv_gaze = conv_gaze.cpu().detach().numpy()
 
-    print(type(true_gaze))
+    # print(type(true_gaze))
     # flatten input maps
     maps = [img.ravel() for img in [true_gaze, conv_gaze]]
 
@@ -257,23 +257,26 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, t
                 # ground truth human gaze maps (7x7)
                 gaze_i, gaze_j = training_gaze[i]
                 
-                print(len(gaze_i[0]))
+                # print(len(gaze_i[0]))
                 gaze_i = np.array(gaze_i)
                 gaze_j = np.array(gaze_j)
-                print('GT gaze map shape: ', gaze_i.shape)
+                # print('GT gaze map shape: ', gaze_i.shape) #(50,1,7,7)
                 # gaze_i = torch.from_numpy(gaze_i).float().to(device)
                 # gaze_j = torch.from_numpy(gaze_j).float().to(device)
 
                 # get normalized conv map output (7x7)
                 gaze_map_i = reward_network.conv_map(traj_i).cpu().detach().numpy()
                 gaze_map_j = reward_network.conv_map(traj_j).cpu().detach().numpy()
-                print('conv map shape: ', gaze_map_i.shape)
+                # print('conv map shape: ', gaze_map_i.shape) #(50,1,7,7)
 
                 gaze_loss = gaze_loss_EMD
                 gaze_loss_i = gaze_loss(gaze_i, gaze_map_i)
                 gaze_loss_j = gaze_loss(gaze_j, gaze_map_j)
 
                 gaze_loss_total = (gaze_loss_i + gaze_loss_j)
+                # gaze_loss_total = np.array([[gaze_loss_total]])
+                # gaze_loss_total = torch.from_numpy(gaze_i).float().to(device)
+                gaze_loss_total = torch.tensor(gaze_loss_total)
                 print('gaze loss: ', gaze_loss_total)            
             
             if not use_gaze:
