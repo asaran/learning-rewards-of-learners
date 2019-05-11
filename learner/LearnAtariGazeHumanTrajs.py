@@ -27,7 +27,7 @@ import utils
 
 # Create training data by taking random 50 length crops of trajectories, computing the true returns and adding them to the training data with the correct label.
 # def create_training_data(demonstrations, returns, gaze_maps, n_train):
-def create_training_data(demonstrations, returns, rewards, gaze_maps, n_train, use_gaze):
+def create_training_data(demonstrations, returns, rewards, gaze_maps, n_train, use_gaze, snippet_length):
     training_obs = []
     training_labels = []
     training_gaze = []
@@ -132,7 +132,9 @@ class Net(nn.Module):
 
     def conv_map(self, traj):
         '''calculate cumulative return of trajectory'''
-        for x in traj:
+        # conv_map_traj = torch.zeros([len(traj), traj[0].shape[0], 7, 7], dtype=torch.float64)
+        conv_map_traj = []
+        for i,x in enumerate(traj):
             x = x.permute(0,3,1,2) #get into NCHW format
             #compute forward pass of reward network
             x = F.leaky_relu(self.conv1(x))
@@ -140,24 +142,26 @@ class Net(nn.Module):
             x = F.leaky_relu(self.conv3(x))
             x_final_conv = F.leaky_relu(self.conv4(x))
             # print(x_final_conv.shape)
-            x_final_conv = x_final_conv.squeeze()
+            # x_final_conv = x_final_conv.squeeze()
             # print(x_final_conv.shape)
-            x_final_conv = x_final_conv.sum(dim=0)
+            x_final_conv = x_final_conv.sum(dim=1) #[batch size, 7, 7], summing all 16 conv filters
             # x = x.view(-1, 784)
             # x = F.leaky_relu(self.fc1(x))            
             # r = self.fc2(x)
             # print(x_final_conv.shape) # [7,7]
-            # print(x_final_conv)
+            # print(type(x_final_conv))
             # print(torch.min(x_final_conv))
             # print(torch.max(x_final_conv))
             min_x = torch.min(x_final_conv)
             max_x = torch.max(x_final_conv)
             x_norm = (x_final_conv - min_x)/(max_x - min_x)
             # print(x_norm)
-            
-        return x_norm
+            # conv_map_traj[i,:,:,:]=x_norm
+            conv_map_traj.append(x_norm)
 
-# Now we train the network. I'm just going to do it one by one for now. Could adapt it for minibatches to get better gradients
+        conv_map_stacked = torch.stack(conv_map_traj)
+        return conv_map_stacked
+
 
 # In[111]:
 
@@ -171,6 +175,7 @@ def gaze_loss_EMD(true_gaze, conv_gaze):
     from scipy.stats import wasserstein_distance
 
     # flatten input maps
+    print(type(true_gaze))
     maps = [img.ravel() for img in [true_gaze, conv_gaze]]
 
     # compute EMD using values
@@ -209,7 +214,7 @@ def gaze_loss_coverage(true_gaze, conv_gaze):
 
     return loss
 
-
+# Now we train the network. I'm just going to do it one by one for now. Could adapt it for minibatches to get better gradients
 def learn_reward(reward_network, optimizer, training_inputs, training_outputs, training_gaze, num_iter, l1_reg, checkpoint_dir, use_gaze):
 
     # multiplier for gaze loss
@@ -223,6 +228,7 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, t
     #print(training_data[0])
     cum_loss = 0.0
     training_data = list(zip(training_inputs, training_outputs))
+    print('training data: ', type(training_inputs[0]))
     for epoch in range(num_iter):
         np.random.shuffle(training_data)
         training_obs, training_labels = zip(*training_data)
@@ -236,7 +242,6 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, t
             traj_i = torch.from_numpy(traj_i).float().to(device)
             traj_j = torch.from_numpy(traj_j).float().to(device)
             labels = torch.from_numpy(labels).to(device)
-
             
             #zero out gradient
             optimizer.zero_grad()
@@ -256,12 +261,12 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, t
                 gaze_i = np.array(gaze_i)
                 gaze_j = np.array(gaze_j)
                 print('GT gaze map shape: ', gaze_i.shape)
-                gaze_i = torch.from_numpy(gaze_i).float().to(device)
-                gaze_j = torch.from_numpy(gaze_j).float().to(device)
+                # gaze_i = torch.from_numpy(gaze_i).float().to(device)
+                # gaze_j = torch.from_numpy(gaze_j).float().to(device)
 
                 # get normalized conv map output (7x7)
-                gaze_map_i = reward_network.conv_map(traj_i)
-                gaze_map_j = reward_network.conv_map(traj_j)
+                gaze_map_i = reward_network.conv_map(traj_i).cpu().detach().numpy()
+                gaze_map_j = reward_network.conv_map(traj_j).cpu().detach().numpy()
                 print('conv map shape: ', gaze_map_i.shape)
 
                 gaze_loss = gaze_loss_EMD
@@ -433,7 +438,7 @@ if __name__=="__main__":
     #plt.show()
 
     # training_obs, training_labels, training_gaze = create_training_data(demonstrations, learning_returns, gaze_maps, n_train)
-    training_obs, training_labels, training_gaze = create_training_data(demonstrations, learning_returns, learning_rewards, learning_gaze, n_train, use_gaze)
+    training_obs, training_labels, training_gaze = create_training_data(demonstrations, learning_returns, learning_rewards, learning_gaze, n_train, use_gaze, snippet_length)
     print("num training_obs", len(training_obs))
     print("num_labels", len(training_labels))
     # Now we create a reward network and optimize it using the training data.
