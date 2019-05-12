@@ -1,3 +1,5 @@
 *.mp4
 *.meta.json
 models/
+eval/*
+learned_models/*
