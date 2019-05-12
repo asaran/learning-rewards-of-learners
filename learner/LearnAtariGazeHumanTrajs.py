@@ -214,7 +214,7 @@ def gaze_loss_coverage(true_gaze, conv_gaze):
 
 # Now we train the network. I'm just going to do it one by one for now. Could adapt it for minibatches to get better gradients
 def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, checkpoint_dir, use_gaze, gaze_loss_type, gaze_reg):
-    training_obs, training_labels, training_gaze = training_data
+    training_inputs, training_outputs, training_gaze = training_data
 
     # multiplier for gaze loss
     # gaze_reg = 0.5
