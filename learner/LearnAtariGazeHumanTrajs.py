@@ -27,7 +27,7 @@ import utils
 
 # Create training data by taking random 50 length crops of trajectories, computing the true returns and adding them to the training data with the correct label.
 # def create_training_data(demonstrations, returns, gaze_maps, n_train):
-def create_training_data(demonstrations, returns, rewards, gaze_maps, n_train, use_gaze, snippet_length):
+def create_training_data(demonstrations, returns, rewards, gaze_maps, n_train, use_gaze, snippet_length, comp_metric):
     training_obs = []
     training_labels = []
     training_gaze = []
@@ -37,10 +37,18 @@ def create_training_data(demonstrations, returns, rewards, gaze_maps, n_train, u
         r_i, r_j = 0, 0   
         rew_i, rew_j = 0, 0
         
+        if comp_metric=='returns':
+            x_i, x_j = r_i, r_j
+        elif comp_metric=='rewards':
+            x_i, x_j = rew_i, rew_j
+        else:
+            print('invalid trajectory comparison metric!')
+            exit(1)
+        
         #only add trajectories that are different returns
         # while(ti == tj):
         # while(r_i == r_j):
-        while(rew_i == rew_j):
+        while(x_i == x_j):
             #pick two random demonstrations
             ti = np.random.randint(num_demos)
             tj = np.random.randint(num_demos)
@@ -72,10 +80,15 @@ def create_training_data(demonstrations, returns, rewards, gaze_maps, n_train, u
                 gaze_i = gaze_maps[ti][ti_start:ti_start+snippet_length]
                 gaze_j = gaze_maps[tj][tj_start:tj_start+snippet_length]
 
+            if comp_metric=='returns':
+                x_i, x_j = r_i, r_j
+            elif comp_metric=='rewards':
+                x_i, x_j = rew_i, rew_j
+
 
         # labels will be created differently
         # if r_i > r_j:
-        if rew_i > rew_j:
+        if x_i > x_j:
             label = 0
         else:
             label = 1
@@ -385,6 +398,7 @@ if __name__=="__main__":
     parser.add_argument('--gaze_loss', default='coverage', help="type of gaze loss function: EMD, coverage, KD")
     parser.add_argument('--gaze_reg', default=0.5, help="gaze loss multiplier")
     parser.add_argument('--snippet_len', default=50, help="snippet lengths of trajectories used for training")
+    parser.add_argument('--metric', default='rewards', help="metric to compare paired trajectories performance: rewards or returns")
 
     args = parser.parse_args()
     env_name = args.env_name
@@ -439,6 +453,7 @@ if __name__=="__main__":
     num_iter = 5 #num times through training data
     l1_reg=0.0
     stochastic = True
+    comp_metric = args.metric
     
     import os
     if not os.path.exists(args.reward_model_path):
@@ -481,7 +496,7 @@ if __name__=="__main__":
     #plt.show()
 
     # training_obs, training_labels, training_gaze = create_training_data(demonstrations, learning_returns, gaze_maps, n_train)
-    training_data  = create_training_data(demonstrations, learning_returns, learning_rewards, learning_gaze, n_train, use_gaze, snippet_length)
+    training_data  = create_training_data(demonstrations, learning_returns, learning_rewards, learning_gaze, n_train, use_gaze, snippet_length, comp_metric)
     training_obs, training_labels, training_gaze = training_data
     print("num training_obs", len(training_obs))
     print("num_labels", len(training_labels))
