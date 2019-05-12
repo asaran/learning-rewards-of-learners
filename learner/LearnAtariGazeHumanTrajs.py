@@ -46,6 +46,13 @@ def create_training_data(demonstrations, returns, rewards, gaze_maps, n_train, u
             tj = np.random.randint(num_demos)
             #print(ti, tj)
             #create random snippets
+            # print('# of demos: ', len(demonstrations))
+            # print('len demo: ',len(demonstrations[ti]), len(demonstrations[tj]))
+
+            # ensure that sampled demo length is greater than the requested snippet length
+            if(len(demonstrations[ti]<snippet_length or len(demonstrations[tj]<snippet_length):
+                continue
+
             ti_start = np.random.randint(len(demonstrations[ti])-snippet_length)
             tj_start = np.random.randint(len(demonstrations[tj])-snippet_length)
             #print("start", ti_start, tj_start)
