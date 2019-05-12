@@ -422,6 +422,9 @@ if __name__=="__main__":
     l1_reg=0.0
     stochastic = True
     
+    import os
+    if not os.path.exists(args.reward_model_path):
+        os.makedirs(args.reward_model_path)
 
     #env id, env type, num envs, and seed
     env = make_vec_env(env_id, 'atari', 1, seed,
