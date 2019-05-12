@@ -180,42 +180,60 @@ def gaze_loss_KL(true_gaze, conv_gaze):
 
 # wasserstein loss or Earth mover's distance
 def gaze_loss_EMD(true_gaze, conv_gaze):
+    # both maps are size snippet_len,batch_size,7,7
+    # iterate over the snippet length and add gaze loss per map comparison
     from pyemd import emd, emd_samples
     from scipy.stats import wasserstein_distance
 
-    # flatten input maps
-    maps = [img.ravel() for img in [true_gaze, conv_gaze]]
+    loss = 0
+    for t,c in zip(true_gaze,conv_gaze):
+        for tb, cb in zip(t,c):
+            
+            # flatten input maps
+            maps = [img.ravel() for img in [tb, cb]]
 
-    # compute EMD using values
-    d1 = emd_samples(maps[0], maps[1]) # 25.57794401220945
-    d2 = wasserstein_distance(maps[0], maps[1]) # 25.76187896728515
+            # compute EMD using values
+            if np.isnan(true_gaze).any():
+                print('True Gaze is nan')
+                print(true_gaze)
+            if np.isnan(conv_gaze).any():
+                print('Conv Gaze is nan')
+            d1 = emd_samples(maps[0], maps[1]) # 25.57794401220945
+            d2 = wasserstein_distance(maps[0], maps[1]) # 25.76187896728515
 
-    # compute EMD using distributions
-    # N_BINS = 256
-    # hists = [np.histogram(img, N_BINS, density=True)[0].astype(np.float64) for img in maps]
+            loss += d1
 
-    # mgrid = np.meshgrid(np.arange(N_BINS), np.arange(N_BINS))
-    # metric = np.abs(mgrid[0] - mgrid[1]).astype(np.float64)
+            # compute EMD using distributions
+            # N_BINS = 256
+            # hists = [np.histogram(img, N_BINS, density=True)[0].astype(np.float64) for img in maps]
 
-    # emd(hists[0], hists[1], metric) # 25.862491463680065
+            # mgrid = np.meshgrid(np.arange(N_BINS), np.arange(N_BINS))
+            # metric = np.abs(mgrid[0] - mgrid[1]).astype(np.float64)
 
-    loss = d1
+            # emd(hists[0], hists[1], metric) # 25.862491463680065
+
+    # loss = d1
     return loss
 
 # coverage based loss, only penalize if conv_gaze is not a superset of true_gaze
 def gaze_loss_coverage(true_gaze, conv_gaze):
     loss = 0
-    # flatten input maps
-    maps = [img.ravel() for img in [true_gaze, conv_gaze]]
 
-    # iterate over all coordinates of the true_gaze map
-    for i in range(len(maps[0])):
-        # compare pixel values between true and conv gaze map
-        # add penalty if difference between true_gaze and conv_gaze pixel values is greater than a threshold (0.5)
-        if abs(maps[0][i]-maps[1][i])>0.5:
-            loss+=abs(maps[0][i]-maps[1][i])
+    loss = 0
+    for t,c in zip(true_gaze,conv_gaze):
+        for tb, cb in zip(t,c):
+            # flatten input maps
+            maps = [img.ravel() for img in [tb, cb]]
 
-    # normalize loss by batch size?
+            # iterate over all coordinates of the true_gaze map
+            for i in range(len(maps[0])):
+                # compare pixel values between true and conv gaze map
+                # add penalty if difference between true_gaze and conv_gaze pixel values is greater than a threshold (0.5)
+                # ignore true gaze map pixels that have a zero value (no attention)
+                if maps[0][i]>0 and abs(maps[0][i]-maps[1][i])>0.5:
+                    loss+=abs(maps[0][i]-maps[1][i])
+
+            # normalize loss by batch size?
 
     return loss
 

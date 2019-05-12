@@ -10,7 +10,12 @@ def normalize_state(obs):
     return obs / 255.0
 
 def normalize(obs, max_val):
-    return obs/float(max_val)
+    #TODO: discard frames with no gaze
+    if(max_val!=0):
+        norm_map = obs/float(max_val)
+    else:
+        norm_map = obs
+    return norm_map
 
 def mask_score(obs, crop_top = True):
     if crop_top:
@@ -120,8 +125,10 @@ def CreateGazeMap(gaze_coords, pic):
         # print(x)
         obs[y,x] = gaze_freq[coords]
 
-    
-    
+    if np.isnan(obs).any():
+        print('nan gaze map created')
+        exit(1)
+
     return obs
 
 def MaxSkipGaze(gaze,  trajectory_dir):
@@ -148,6 +155,10 @@ def MaxSkipGaze(gaze,  trajectory_dir):
             image = obs_buffer.max(axis=0)
             max_frames.append(image)
     # print('num gaze frames: ', len(max_frames))
+    if np.isnan(max_frames).any():
+        print('nan max gaze map created')
+        exit(1)
+            
     return max_frames
 
 def StackGaze(gaze_frames):
@@ -168,7 +179,11 @@ def StackGaze(gaze_frames):
             max_gaze_freq = np.amax(stacked_obs)
             stacked_obs = normalize(stacked_obs, max_gaze_freq)
 
-            stacked.append(np.expand_dims(copy.deepcopy(stacked_obs),0))
+            stacked.append(np.expand_dims(copy.deepcopy(stacked_obs),0)) # shape: (1,7,7)
+
+    if np.isnan(stacked).any():
+        print('nan stacked gaze map created')
+        exit(1)
     return stacked
 
 def MaxSkipReward(rewards):
