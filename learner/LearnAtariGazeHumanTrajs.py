@@ -166,6 +166,8 @@ class Net(nn.Module):
 # In[111]:
 
 def gaze_loss_KL(true_gaze, conv_gaze):
+    true_gaze = torch.from_numpy(true_gaze).float().to(device)
+    conv_gaze = torch.from_numpy(conv_gaze).float().to(device)
     loss = F.kl_div(true_gaze, conv_gaze)
     return loss
 
@@ -175,7 +177,6 @@ def gaze_loss_EMD(true_gaze, conv_gaze):
     from scipy.stats import wasserstein_distance
 
     # flatten input maps
-    # print(type(true_gaze))
     maps = [img.ravel() for img in [true_gaze, conv_gaze]]
 
     # compute EMD using values
@@ -196,10 +197,7 @@ def gaze_loss_EMD(true_gaze, conv_gaze):
 
 # coverage based loss, only penalize if conv_gaze is not a superset of true_gaze
 def gaze_loss_coverage(true_gaze, conv_gaze):
-    true_gaze = true_gaze.cpu().detach().numpy()
-    conv_gaze = conv_gaze.cpu().detach().numpy()
-
-    # print(type(true_gaze))
+    loss = 0
     # flatten input maps
     maps = [img.ravel() for img in [true_gaze, conv_gaze]]
 
@@ -215,10 +213,19 @@ def gaze_loss_coverage(true_gaze, conv_gaze):
     return loss
 
 # Now we train the network. I'm just going to do it one by one for now. Could adapt it for minibatches to get better gradients
-def learn_reward(reward_network, optimizer, training_inputs, training_outputs, training_gaze, num_iter, l1_reg, checkpoint_dir, use_gaze):
+def learn_reward(reward_network, optimizer, training_inputs, training_outputs, training_gaze, num_iter, l1_reg, checkpoint_dir, use_gaze, gaze_loss_type, gaze_reg):
 
     # multiplier for gaze loss
-    gaze_reg = 0.5
+    # gaze_reg = 0.5
+    if gaze_loss_type=='EMD':
+        gaze_loss = gaze_loss_EMD
+    elif gaze_loss_type=='coverage':
+        gaze_loss = gaze_loss_coverage
+    elif gaze_loss_type=='KL':
+        gaze_loss = gaze_loss_KL
+    else:
+        print('Invalid gaze loss type')
+        exit(1)
 
     #check if gpu available
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -269,7 +276,7 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, t
                 gaze_map_j = reward_network.conv_map(traj_j).cpu().detach().numpy()
                 # print('conv map shape: ', gaze_map_i.shape) #(50,1,7,7)
 
-                gaze_loss = gaze_loss_EMD
+                
                 gaze_loss_i = gaze_loss(gaze_i, gaze_map_i)
                 gaze_loss_j = gaze_loss(gaze_j, gaze_map_j)
 
@@ -349,6 +356,8 @@ if __name__=="__main__":
     parser.add_argument('--seed', default=0, help="random seed for experiments")
     parser.add_argument('--data_dir', help="where atari-head data is located")
     parser.add_argument('--use_gaze', default=False, help="where atari-head data is located")
+    parser.add_argument('--gaze_loss', default='coverage', help="type of gaze loss function: EMD, coverage, KD")
+    parser.add_argument('--gaze_reg', default=0.5, help="gaze loss multiplier")
     parser.add_argument('--snippet_len', default=50, help="snippet lengths of trajectories used for training")
 
     args = parser.parse_args()
@@ -385,6 +394,8 @@ if __name__=="__main__":
         sys.exit(1)
 
     use_gaze = args.use_gaze
+    gaze_loss_type = args.gaze_loss
+    gaze_reg = args.gaze_reg
 
     env_type = "atari"
     print(env_type)
@@ -402,7 +413,7 @@ if __name__=="__main__":
     num_iter = 5 #num times through training data
     l1_reg=0.0
     stochastic = True
-    gaze_reg = 0.5
+    
 
     #env id, env type, num envs, and seed
     env = make_vec_env(env_id, 'atari', 1, seed,
@@ -441,7 +452,8 @@ if __name__=="__main__":
     #plt.show()
 
     # training_obs, training_labels, training_gaze = create_training_data(demonstrations, learning_returns, gaze_maps, n_train)
-    training_obs, training_labels, training_gaze = create_training_data(demonstrations, learning_returns, learning_rewards, learning_gaze, n_train, use_gaze, snippet_length)
+    training_data  = create_training_data(demonstrations, learning_returns, learning_rewards, learning_gaze, n_train, use_gaze, snippet_length)
+    training_obs, training_labels, training_gaze = training_data
     print("num training_obs", len(training_obs))
     print("num_labels", len(training_labels))
     # Now we create a reward network and optimize it using the training data.
@@ -451,7 +463,7 @@ if __name__=="__main__":
 
     import torch.optim as optim
     optimizer = optim.Adam(reward_net.parameters(),  lr=lr, weight_decay=weight_decay)
-    learn_reward(reward_net, optimizer, training_obs, training_labels, training_gaze, num_iter, l1_reg, args.reward_model_path, use_gaze)
+    learn_reward(reward_net, optimizer, training_data, num_iter, l1_reg, args.reward_model_path, use_gaze, gaze_loss_type, gaze_reg)
 
     with torch.no_grad():
         pred_returns = [predict_traj_return(reward_net, traj) for traj in demonstrations]
