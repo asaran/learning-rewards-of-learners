@@ -436,7 +436,7 @@ if __name__=="__main__":
 
     use_gaze = args.use_gaze
     gaze_loss_type = args.gaze_loss
-    gaze_reg = args.gaze_reg
+    gaze_reg = float(args.gaze_reg)
     mask = args.mask_scores
 
     env_type = "atari"
