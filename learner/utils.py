@@ -213,7 +213,7 @@ def StackReward(rewards):
     stacked_obs = np.zeros((1,))
     for i in range(len(rewards)):
         if i >= 3:
-            # SUm over the rewards across four frames
+            # Sum over the rewards across four frames
             stacked_obs = rewards[i-3]
             stacked_obs = stacked_obs + rewards[i-2]
             stacked_obs = stacked_obs + rewards[i-1]
@@ -293,7 +293,7 @@ def get_sorted_traj_indices(env_name, dataset):
     return demos
 
 
-def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze):
+def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, mask_scores):
     """returns an array of trajectories corresponding to what you would get running checkpoints from PPO
        demonstrations are grayscaled, maxpooled, stacks of 4 with normalized values between 0 and 1 and
        top section of screen is masked
@@ -322,8 +322,10 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze):
         demo_norm_mask = []
         #normalize values to be between 0 and 1 and have top part masked
         for ob in stacked_traj:
-            # demo_norm_mask.append(mask_score(normalize_state(ob), crop_top))
-            demo_norm_mask.append(normalize_state(ob))  # currently not cropping
+            if mask_scores:
+                demo_norm_mask.append(mask_score(normalize_state(ob), crop_top))
+            else:
+                demo_norm_mask.append(normalize_state(ob))  # currently not cropping
         human_demos.append(demo_norm_mask)
 
         # skip and stack reward

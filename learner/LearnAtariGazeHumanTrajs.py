@@ -394,11 +394,12 @@ if __name__=="__main__":
     parser.add_argument('--reward_model_path', default='', help="name and location for learned model params")
     parser.add_argument('--seed', default=0, help="random seed for experiments")
     parser.add_argument('--data_dir', help="where atari-head data is located")
-    parser.add_argument('--use_gaze', default=False, help="where atari-head data is located")
+    parser.add_argument('--use_gaze', default=False, help="use gaze loss or not")
     parser.add_argument('--gaze_loss', default='coverage', help="type of gaze loss function: EMD, coverage, KD")
     parser.add_argument('--gaze_reg', default=0.5, help="gaze loss multiplier")
     parser.add_argument('--snippet_len', default=50, help="snippet lengths of trajectories used for training")
     parser.add_argument('--metric', default='rewards', help="metric to compare paired trajectories performance: rewards or returns")
+    parser.add_argument('--mask_scores', default=False, help="mask scores on game screen or not")
 
     args = parser.parse_args()
     env_name = args.env_name
@@ -436,6 +437,7 @@ if __name__=="__main__":
     use_gaze = args.use_gaze
     gaze_loss_type = args.gaze_loss
     gaze_reg = args.gaze_reg
+    mask = args.mask_scores
 
     env_type = "atari"
     print(env_type)
@@ -473,7 +475,7 @@ if __name__=="__main__":
     # dataset = ds.AtariDataset(data_dir)
     # demonstrations, learning_returns = agc_demos.get_preprocessed_trajectories(agc_env_name, dataset, data_dir)
     dataset = ahd.AtariHeadDataset(env_name, data_dir)
-    demonstrations, learning_returns, learning_rewards, learning_gaze = utils.get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze)
+    demonstrations, learning_returns, learning_rewards, learning_gaze = utils.get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, mask)
 
     # Let's plot the returns to see if they are roughly monotonically increasing.
     #plt.plot(learning_returns)
