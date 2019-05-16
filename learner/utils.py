@@ -109,10 +109,27 @@ def CreateGazeMap(gaze_coords, pic):
             if(not np.isnan(gaze_coords[j]) and not np.isnan(gaze_coords[j+1])):
                 x = (gaze_coords[j])*w/old_w
                 y = (gaze_coords[j+1])*h/old_h
+
+                g_coords = [gaze_coords[j], gaze_coords[j+1]]
+                i_size = [old_w,old_h]
                 # print('orig size: ',old_w,old_h)
                 # print('gaze_coords:',gaze_coords[j], gaze_coords[j+1])
                 # print('coords for 84x84: ',x,y)
+                if(gaze_coords[j]>old_w-1 or gaze_coords[j+1]>old_h-1):
+                #     print('gaze coordinates outside right/lower border')
+                #     print('gaze coordinates: ',gaze_coords[j], gaze_coords[j+1])
+                    print(str(g_coords)+'\t'+str(i_size))
+                #     print('image size: ', old_w, old_h)
+                    # exit(1)
+                # if(gaze_coords[j]<0 or gaze_coords[j+1]<0):
+                    # print('gaze coordinates outside left/upper border')
+                    # print('gaze coordinates: ', gaze_coords[j], gaze_coords[j+1])
+                    # print('image size: ', old_w, old_h)
+                    
+                    # print(str(g_coords)+'\t'+str(i_size))
+                    # exit(1)
                 x, y = min(int(x),w-1), min(int(y),h-1)
+                
                 # print('int',x,y)
                 if (x,y) not in gaze_freq:
                     gaze_freq[(x,y)] = 1
