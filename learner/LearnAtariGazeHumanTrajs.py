@@ -232,7 +232,6 @@ def gaze_loss_EMD(true_gaze, conv_gaze):
 def gaze_loss_coverage(true_gaze, conv_gaze):
     loss = 0
 
-    loss = 0
     for t,c in zip(true_gaze,conv_gaze):
         for tb, cb in zip(t,c):
             # flatten input maps
@@ -246,7 +245,7 @@ def gaze_loss_coverage(true_gaze, conv_gaze):
                 if maps[0][i]>0 and abs(maps[0][i]-maps[1][i])>0.5:
                     loss+=abs(maps[0][i]-maps[1][i])
 
-            # normalize loss by batch size?
+            # normalize loss by batch size? Currently batch size is zero.
 
     return loss
 
