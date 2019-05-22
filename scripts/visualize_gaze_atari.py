@@ -1,11 +1,11 @@
 import numpy as np
 import cv2
 
-img_folder = '/home/akanksha/Documents/gaze_atari/hero/195_RZ_205678_Jun-28-12-09-00/'
-file = open("/home/akanksha/Documents/gaze_atari/hero/195_RZ_205678_Jun-28-12-09-00.txt")
+img_folder = '../data/atari-head/hero/195_RZ_205678_Jun-28-12-09-00/'
+file = open("../data/atari-head/hero/195_RZ_205678_Jun-28-12-09-00.txt")
 fps = 20
 format="XVID"
-outvid='/home/akanksha/Documents/gaze_atari/hero/195_RZ_205678_Jun-28-12-09-00.avi'
+outvid='../data/hero_no_blink_195_RZ_205678_Jun-28-12-09-00.avi'
 fourcc = cv2.VideoWriter_fourcc(*format)
 vid = None
 size = None
@@ -39,7 +39,9 @@ action_name = {
 }
 
 font                   = cv2.FONT_HERSHEY_SIMPLEX
-bottomLeftCornerOfText = (10,10)
+topLeftCornerOfText = (10,10)
+bottomLeftCornerOfText = (10,180)
+bottomRightCornerOfText = (110,180)
 fontScale              = 0.25
 fontColor              = (255,255,255)
 lineType               = 1
@@ -47,6 +49,11 @@ lineType               = 1
 line = file.readline()
 # print(line)
 i = 0
+blink = False
+#speed = [0,0]
+#previous_gaze = [0,0]
+counter = 0
+
 for line in file:	
 	contents = line.split(',')
 	# if (i==0):
@@ -76,17 +83,30 @@ for line in file:
 		if('null' not in gaze[j]):
 			x = float(gaze[j])
 			y = float(gaze[j+1])
+		if(y>205):
+			blink = True 
+			counter = 0
+		if blink:
+			counter+=1
+			cv2.putText(img,'BLINKING',
+                        bottomLeftCornerOfText, font, fontScale, (0,255,0), lineType)	
+		if counter==300 and blink==True:
+			blink=False
+
+		gaze_coord_text = '('+str(x)+','+str(y)+')'
+		cv2.putText(img, gaze_coord_text,
+                        bottomRightCornerOfText, font, 0.4, (0,255,0), lineType)
 		cv2.circle(img, (int(x),int(y)), 5, (0,255,0), thickness=1, lineType=8, shift=0)
 
 		# TODO: show action and return on the video
 		print(action_name[action])
 		cv2.putText(img,action_name[action], 
-		    bottomLeftCornerOfText, 
+		    topLeftCornerOfText, 
 		    font, 
 		    fontScale,
 		    fontColor,
 		    lineType)
-
+	i+=1
 
 	vid.write(img)
 vid.release()
