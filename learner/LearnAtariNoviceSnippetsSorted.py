@@ -16,7 +16,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from run_test import *
 
-def normalize_state(obs):
+def normalize_state(obs, env):
     obs_highs = env.observation_space.high
     obs_lows = env.observation_space.low
     #print(obs_highs)
@@ -89,7 +89,7 @@ def generate_novice_demos(env, env_name, agent, model_dir):
                 action = agent.act(ob, r, done)
                 ob, r, done, _ = env.step(action)
                 #print(ob.shape)
-                traj.append(mask_score(normalize_state(ob), crop_top))
+                traj.append(mask_score(normalize_state(ob, env), crop_top))
 
                 gt_rewards.append(r[0])
                 steps += 1

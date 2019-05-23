@@ -110,3 +110,5 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+path_to_logs/*

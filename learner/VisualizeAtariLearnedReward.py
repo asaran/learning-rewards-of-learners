@@ -193,7 +193,6 @@ print(checkpoints_extrapolate)
 
 # In[9]:
 
-
 from baselines.common.trex_utils import preprocess
 model_dir = args.models_dir
 demonstrations = []

@@ -17,7 +17,7 @@ from run_test import *
 # from utils import get_atari_head_demos
 import atari_head_dataset as ahd 
 import utils
-
+import LearnAtariNoviceSnippetsSorted as novice 
 #cheat and sort them to see if it helps learning
 #sorted_demos = [x for _, x in sorted(zip(learning_returns,demonstrations), key=lambda pair: pair[0])]
 #sorted_returns = sorted(learning_returns)
@@ -298,37 +298,41 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
             output_loss = loss_criterion(outputs, labels)
             print('output loss: ', output_loss)
 
-            if use_gaze:
-                # ground truth human gaze maps (7x7)
-                gaze_i, gaze_j = training_gaze[i]
+            if i<len(training_gaze):
+                if use_gaze:
+                    # ground truth human gaze maps (7x7)
+                    gaze_i, gaze_j = training_gaze[i]
+                    
+                    # print(len(gaze_i[0]))
+                    gaze_i = np.array(gaze_i)
+                    gaze_j = np.array(gaze_j)
+                    # print('GT gaze map shape: ', gaze_i.shape) #(50,1,7,7)
+                    # gaze_i = torch.from_numpy(gaze_i).float().to(device)
+                    # gaze_j = torch.from_numpy(gaze_j).float().to(device)
+
+                    # get normalized conv map output (7x7)
+                    gaze_map_i = reward_network.conv_map(traj_i).cpu().detach().numpy()
+                    gaze_map_j = reward_network.conv_map(traj_j).cpu().detach().numpy()
+                    # print('conv map shape: ', gaze_map_i.shape) #(50,1,7,7)
+                    
+                    gaze_loss_i = gaze_loss(gaze_i, gaze_map_i)
+                    gaze_loss_j = gaze_loss(gaze_j, gaze_map_j)
+
+                    gaze_loss_total = (gaze_loss_i + gaze_loss_j)
+                    # gaze_loss_total = np.array([[gaze_loss_total]])
+                    # gaze_loss_total = torch.from_numpy(gaze_i).float().to(device)
+                    gaze_loss_total = torch.tensor(gaze_loss_total)
+                    print('gaze loss: ', gaze_loss_total)            
                 
-                # print(len(gaze_i[0]))
-                gaze_i = np.array(gaze_i)
-                gaze_j = np.array(gaze_j)
-                # print('GT gaze map shape: ', gaze_i.shape) #(50,1,7,7)
-                # gaze_i = torch.from_numpy(gaze_i).float().to(device)
-                # gaze_j = torch.from_numpy(gaze_j).float().to(device)
+                if not use_gaze:
+                    loss = output_loss + l1_reg * abs_rewards
+                else:
+                    loss = output_loss + l1_reg * abs_rewards + gaze_reg * gaze_loss_total
+                print('total loss: ', loss)  
 
-                # get normalized conv map output (7x7)
-                gaze_map_i = reward_network.conv_map(traj_i).cpu().detach().numpy()
-                gaze_map_j = reward_network.conv_map(traj_j).cpu().detach().numpy()
-                # print('conv map shape: ', gaze_map_i.shape) #(50,1,7,7)
-
-                
-                gaze_loss_i = gaze_loss(gaze_i, gaze_map_i)
-                gaze_loss_j = gaze_loss(gaze_j, gaze_map_j)
-
-                gaze_loss_total = (gaze_loss_i + gaze_loss_j)
-                # gaze_loss_total = np.array([[gaze_loss_total]])
-                # gaze_loss_total = torch.from_numpy(gaze_i).float().to(device)
-                gaze_loss_total = torch.tensor(gaze_loss_total)
-                print('gaze loss: ', gaze_loss_total)            
-            
-            if not use_gaze:
-                loss = output_loss + l1_reg * abs_rewards
             else:
-                loss = output_loss + l1_reg * abs_rewards + gaze_reg * gaze_loss_total
-            print('total loss: ', loss)            
+                loss = output_loss + l1_reg * abs_rewards
+                print('total loss: ', loss)  
 
             loss.backward()
             optimizer.step()
@@ -393,12 +397,14 @@ if __name__=="__main__":
     parser.add_argument('--reward_model_path', default='', help="name and location for learned model params")
     parser.add_argument('--seed', default=0, help="random seed for experiments")
     parser.add_argument('--data_dir', help="where atari-head data is located")
-    parser.add_argument('--use_gaze', default=False, help="use gaze loss or not")
+    parser.add_argument('--use_gaze', default=False, action='store_true', help="use gaze loss or not")
     parser.add_argument('--gaze_loss', default='coverage', help="type of gaze loss function: EMD, coverage, KD")
     parser.add_argument('--gaze_reg', default=0.5, help="gaze loss multiplier")
     parser.add_argument('--snippet_len', default=50, help="snippet lengths of trajectories used for training")
     parser.add_argument('--metric', default='rewards', help="metric to compare paired trajectories performance: rewards or returns")
-    parser.add_argument('--mask_scores', default=False, help="mask scores on game screen or not")
+    parser.add_argument('--mask_scores', default=False, action='store_true', help="mask scores on game screen or not")
+    parser.add_argument('--use_old_data', default=False, action='store_true', help="use data without gaze from PPO checkpoints ")
+    parser.add_argument('--models_dir', default = ".", help="top directory where checkpoint models for demos are stored")
 
     args = parser.parse_args()
     env_name = args.env_name
@@ -476,6 +482,7 @@ if __name__=="__main__":
     dataset = ahd.AtariHeadDataset(env_name, data_dir)
     demonstrations, learning_returns, learning_rewards, learning_gaze = utils.get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, mask)
 
+
     # Let's plot the returns to see if they are roughly monotonically increasing.
     #plt.plot(learning_returns)
     #plt.xlabel("Demonstration")
@@ -501,10 +508,26 @@ if __name__=="__main__":
     training_obs, training_labels, training_gaze = training_data
     print("num training_obs", len(training_obs))
     print("num_labels", len(training_labels))
+
+
+    # Get demos from stored PPO checkpoints
+    demonstrations2, learning_returns2, learning_rewards2 = novice.generate_novice_demos(env, env_name, agent, args.models_dir)
+    demonstrations2 = [x for _, x in sorted(zip(learning_returns2,demonstrations2), key=lambda pair: pair[0])]
+    sorted_returns2 = sorted(learning_returns2)
+    training_obs2, training_labels2 = novice.create_training_data(demonstrations2, n_train, snippet_length)
+    training_obs = training_obs + training_obs2
+    training_labels = training_labels + training_labels2
+    demonstrations = demonstrations + demonstrations2
+    learning_returns = learning_returns + learning_returns2
+    learning_rewards = learning_rewards + learning_rewards2
+
+    training_data = [training_obs, training_labels, training_gaze]
+
     # Now we create a reward network and optimize it using the training data.
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     reward_net = Net()
     reward_net.to(device)
+
 
     import torch.optim as optim
     optimizer = optim.Adam(reward_net.parameters(),  lr=lr, weight_decay=weight_decay)
