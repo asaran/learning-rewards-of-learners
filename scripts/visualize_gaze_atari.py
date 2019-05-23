@@ -44,7 +44,7 @@ action_name = {
 }
 
 font                   = cv2.FONT_HERSHEY_SIMPLEX
-topLeftCornerOfText = (10,10)
+topLeftCornerOfText    = (10,10)
 bottomLeftCornerOfText = (10,180)
 bottomRightCornerOfText = (130,180)
 fontScale              = 0.25
@@ -58,7 +58,43 @@ blink = False
 #speed = [0,0]
 #previous_gaze = [0,0]
 counter = 0
+colors = [(0,255,0),(0,0,255)]
 
+k=0
+gaze_ignore = []
+for line in f:
+	k+=1
+	gaze_ignore.append(0)
+	contents = line.split(',')
+	# if (i==0):
+			# print(contents[0])
+	# i = 1
+	img_name = contents[0]
+	episode = contents[1]
+	score = contents[2]
+	duration = contents[3]
+	unclipped_reward = contents[4]
+	action = contents[5]
+	gaze = contents[6:]
+
+	img = cv2.imread(img_folder+img_name+'.png')
+
+	for j in range(0,len(gaze),2):
+		if('null' not in gaze[j]):
+			x = float(gaze[j])
+			y = float(gaze[j+1])
+		if(y>200):
+			blink = True
+	if blink:
+		if(len(gaze_ignore))>10:    
+			gaze_ignore[k-10:k] = np.ones(60)	
+		blink=False 
+
+f.close()
+f = open(trial+".txt")
+line = f.readline()
+blink = False
+k = 0
 for line in f:	
 	contents = line.split(',')
 	# if (i==0):
@@ -88,30 +124,34 @@ for line in f:
 		if('null' not in gaze[j]):
 			x = float(gaze[j])
 			y = float(gaze[j+1])
-		if(y>205):
+		if(y>200):
 			blink = True 
 			counter = 0
+			text_color = colors[(i+1)%2]
 		if blink:
 			counter+=1
 			cv2.putText(img,'BLINKING',
-                        bottomLeftCornerOfText, font, fontScale, (0,255,0), lineType)	
-		if counter==600 and blink==True:
+						bottomLeftCornerOfText, font, fontScale, text_color, lineType)	
+		if counter==300 and blink==True:
 			blink=False
 
 		gaze_coord_text = '('+str(int(x))+','+str(int(y))+')'
-		cv2.putText(img, gaze_coord_text,
-                        bottomRightCornerOfText, font, 0.2, (0,255,0), lineType)
-		cv2.circle(img, (int(x),int(y)), 5, (0,255,0), thickness=1, lineType=8, shift=0)
+		cv2.putText(img, gaze_coord_text, bottomRightCornerOfText, 
+			font, 0.2, (0,255,0), lineType)
+		
+		if gaze_ignore[k]==0:
+			cv2.circle(img, (int(x),int(y)), 5, (0,255,0), thickness=1, lineType=8, shift=0)
 
 		# TODO: show action and return on the video
 		#print(action_name[action])
 		cv2.putText(img,action_name[action], 
-		    topLeftCornerOfText, 
-		    font, 
-		    fontScale,
-		    fontColor,
-		    lineType)
-	i+=1
+			topLeftCornerOfText, 
+			font, 
+			fontScale,
+			fontColor,
+			lineType)
+	#i+=1
+	k+=1
 
 	vid.write(img)
 vid.release()
