@@ -6,21 +6,7 @@ import cv2
 cv2.ocl.setUseOpenCL(False)
 #import matplotlib.pyplot as plt
 import argparse
-
-def normalize_state(obs):
-    return obs / 255.0
-
-
-def mask_score(obs, crop_top = True):
-    if crop_top:
-        #takes a stack of four observations and blacks out (sets to zero) top n rows
-        n = 10
-        #no_score_obs = copy.deepcopy(obs)
-        obs[:,:n,:,:] = 0
-    else:
-        n = 20
-        obs[:,-n:,:,:] = 0
-    return obs
+from baselines.common.trex_utils import preprocess
 
 #need to grayscale and warp to 84x84
 def GrayScaleWarpImage(image):
@@ -107,9 +93,10 @@ def get_sorted_traj_indices(env_name, dataset):
             seen_scores.add(s)
             non_duplicates.append((i,s))
     print("num non duplicate scores", len(seen_scores))
+    num_demos = 12
     if env_name == "spaceinvaders":
         start = 0
-        skip = 3
+        skip = 4
     elif env_name == "revenge":
         start = 0
         skip = 1
@@ -118,13 +105,19 @@ def get_sorted_traj_indices(env_name, dataset):
         skip = 3
     elif env_name == "mspacman":
         start = 0
+        skip = 3
+    elif env_name == "pinball":
+        start = 0
         skip = 1
-    num_demos = 12
+    elif env_name == "revenge":
+        start = 0
+        skip = 1
+
     demos = non_duplicates[start:num_demos*skip + start:skip]
     print("(index, score) pairs:",demos)
     return demos
 
-def get_preprocessed_trajectories(env_name, dataset, data_dir):
+def get_preprocessed_trajectories(env_name, dataset, data_dir, preprocess_name):
     """returns an array of trajectories corresponding to what you would get running checkpoints from PPO
        demonstrations are grayscaled, maxpooled, stacks of 4 with normalized values between 0 and 1 and
        top section of screen is masked
@@ -149,24 +142,25 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir):
         demo_norm_mask = []
         #normalize values to be between 0 and 1 and have top part masked
         for ob in stacked_traj:
-            demo_norm_mask.append(mask_score(normalize_state(ob), crop_top))
+            demo_norm_mask.append(preprocess(ob, preprocess_name)[0])
         human_demos.append(demo_norm_mask)
     return human_demos, human_scores
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env', default='', help="AGC environment name: spaceinvaders, qbert, mspacman, revenge, pinball")
+    parser.add_argument('--agc_env', default='', help="AGC environment name: spaceinvaders, qbert, mspacman, revenge, pinball")
+    parser.add_argument('--atari_full_env', help="Full lowercase atari env name: eg spaceinvadrs, montezumarevenge, etc")
     parser.add_argument('--datadir', default=None, help='location of atari gc data')
     args = parser.parse_args()
-    env_name = args.env
+    env_name = args.agc_env
     args.datadir
     if args.datadir is None:
         data_dir = '/home/dsbrown/Code/atarigrandchallenge/atari_v1'
     else:
         data_dir = args.datadir
     dataset = ds.AtariDataset(data_dir)
-    human_demos, human_scores = get_preprocessed_trajectories(env_name, dataset, data_dir)
+    human_demos, human_scores = get_preprocessed_trajectories(env_name, dataset, data_dir, args.atari_full_env)
     print(human_scores)
     #print(human_demos[0][0])
     print(max(human_scores))

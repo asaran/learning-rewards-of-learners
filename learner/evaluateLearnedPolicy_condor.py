@@ -10,7 +10,7 @@ from run_test import *
 #import matplotlib.pylab as plt
 import argparse
 
-def evaluate_learned_policy(env_name, checkpoint, rep):
+def evaluate_learned_policy(env_name, tflogdir, checkpoint, rep):
     if env_name == "spaceinvaders":
         env_id = "SpaceInvadersNoFrameskip-v4"
     elif env_name == "mspacman":
@@ -19,20 +19,12 @@ def evaluate_learned_policy(env_name, checkpoint, rep):
         env_id = "VideoPinballNoFrameskip-v4"
     elif env_name == "beamrider":
         env_id = "BeamRiderNoFrameskip-v4"
-    elif env_name == "seaquest":
-        env_id = "SeaquestNoFrameskip-v4"
-    elif env_name == "enduro":
-        env_id = "EnduroNoFrameskip-v4"
-    elif env_name == "hero":
-        env_id = "HeroNoFrameskip-v4"
-    elif env_name == "breakout":
-        env_id = "BreakoutNoFrameskip-v4"
     else:
         env_id = env_name[0].upper() + env_name[1:] + "NoFrameskip-v4"
 
     env_type = "atari"
 
-    stochastic = False
+    stochastic = True
 
     #env id, env type, num envs, and seed
     env = make_vec_env(env_id, 'atari', 1, 0,
@@ -50,14 +42,12 @@ def evaluate_learned_policy(env_name, checkpoint, rep):
     #agent = RandomAgent(env.action_space)
 
     learning_returns = []
-    # model_path = "/scratch/cluster/dsbrown/tflogs/" + env_name + "20env_" + str(rep) + "/checkpoints/" + checkpoint
-    # model_path = "/home/dsbrown/Code/learning-rewards-of-learners/learner/models/spaceinvaders/checkpoints/" + checkpoint
-    #model_path = '/home/akanksha/learning-rewards-of-learners/path_to_logs/hero/checkpoints/'+checkpoint
-    model_path = '/scratch/cluster/asaran/learning-rewards-of-learners/learner/path_to_logs/'+checkpoint
+    model_path = "/scratch/cluster/dsbrown/tflogs/" + env_name + tflogdir + str(rep) + "/checkpoints/" + checkpoint
+    #model_path = "/home/dsbrown/Code/learning-rewards-of-learners/learner/models/spaceinvaders/checkpoints/" + checkpoint
     print(model_path)
 
     agent.load(model_path)
-    episode_count = 5
+    episode_count = 10
     for i in range(episode_count):
         done = False
         traj = []
@@ -97,10 +87,12 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser(description=None)
     parser.add_argument('--seed', default=1234, help="random seed for experiments")
     parser.add_argument('--env_name', default='', help='Select the environment name to run, i.e. pong')
+    parser.add_argument('--tflogdir', default='20env_', help='postfix to append to env_name to get tflogs')
     parser.add_argument('--checkpoint', default='', help='checkpoint to run eval on')
     parser.add_argument('--rep', default='', help='which trial to evaluate')
     args = parser.parse_args()
     env_name = args.env_name
+    tflogdir = args.tflogdir
     #set seeds
     seed = int(args.seed)
     torch.manual_seed(seed)
@@ -112,10 +104,9 @@ if __name__=="__main__":
     print("*"*10)
     print(env_name)
     print("*"*10)
-    returns = evaluate_learned_policy(env_name, checkpoint, rep)
+    returns = evaluate_learned_policy(env_name, tflogdir, checkpoint, rep)
     #write returns to file
-    #f = open("./eval/" + env_name + "_" + checkpoint + "_" + "eval.txt",'w')
-    f = open("./eval/" + checkpoint.split('/')[0] + "_" + "eval.txt",'w')
+    f = open("./eval/" + env_name + tflogdir + checkpoint + "_" + rep + "eval.txt",'w')
     for r in returns:
         f.write("{}\n".format(r))
     f.close()

@@ -267,7 +267,7 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
                 print(abs_rewards)
                 cum_loss = 0.0
                 print("check pointing")
-                torch.save(reward_net.state_dict(), checkpoint_dir+"/"+str(i)+'.pth')
+                torch.save(reward_net.state_dict(), checkpoint_dir)
     print("finished training")
 
 
@@ -407,4 +407,4 @@ if __name__=="__main__":
 
 
     #TODO:add checkpoints to training process
-    torch.save(reward_net.state_dict(), args.reward_model_path+"/model.pth")
+    torch.save(reward_net.state_dict(), args.reward_model_path)

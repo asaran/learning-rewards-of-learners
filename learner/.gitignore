@@ -3,3 +3,4 @@
 models/
 eval/*
 learned_models/*
+gym/*
