@@ -3,7 +3,7 @@
 ## Preference Learning
 
 ### Installation
-Clone the for-LfL branch for https://github.com/dsbrown1331/baselines/tree/for-LfL
+Clone the for-LfL branch for https://github.com/asaran/baselines/tree/for-LfL
 inside the learning-rewards-of-learners/learner/ directory and then install baselines
 
 ```
