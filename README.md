@@ -28,9 +28,19 @@ python LearnAtariNoviceSnippetsSorted.py --env_name breakout --models_dir . --re
 python LearnAtariNoviceSnippetsSortedSelfAttention.py --env_name breakout --models_dir . --reward_model_path learned_models/self-attention-test
 ```
 
-### Training PPO on custom learned reward (in progress)
+### Training PPO on custom learned reward 
+
+#### Without self attention
+
+
 ```
-OPENAI_LOG_FORMAT='stdout,log,csv,tensorboard' OPENAI_LOGDIR=path_to_logs/breakout-test python -m baselines.run --alg=ppo2 --env=SpaceInvadersNoFrameskip-v4 --save_interval=50 --custom_reward pytorch --custom_reward_path learned_models/breakout-test --num_timesteps=2e7
+OPENAI_LOG_FORMAT='stdout,log,csv,tensorboard' OPENAI_LOGDIR=path_to_logs/breakout-self python -m baselines.run --alg=ppo2 --env=BreakoutNoFrameskip-v4 --save_interval=50 --custom_reward pytorch --custom_reward_path learned_models/self-attention-test --num_timesteps=2e7 
+```
+
+#### With self attention
+
+```
+OPENAI_LOG_FORMAT='stdout,log,csv,tensorboard' OPENAI_LOGDIR=path_to_logs/breakout-self python -m baselines.run --alg=ppo2 --env=BreakoutNoFrameskip-v4 --save_interval=50 --custom_reward pytorch --custom_reward_path learned_models/self-attention-test --num_timesteps=2e7 --self_attention
 ```
 
 ### Evaluating the learned PPO policy (in progress)
