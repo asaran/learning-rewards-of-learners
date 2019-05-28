@@ -14,6 +14,9 @@ pip install -e .
 Also install gym for the Atari environments:
 https://github.com/openai/gym
 
+### Demonstration Data
+Use checkpointed files for producing the demonstrations. You can download some here: https://github.com/dsbrown1331/learning-rewards-of-learners/releases/tag/atari25 and put them in the learner/models directory. 
+
 
 ### Training the reward 
 
