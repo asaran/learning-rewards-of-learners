@@ -46,7 +46,7 @@ OPENAI_LOG_FORMAT='stdout,log,csv,tensorboard' OPENAI_LOGDIR=path_to_logs/breako
 OPENAI_LOG_FORMAT='stdout,log,csv,tensorboard' OPENAI_LOGDIR=path_to_logs/breakout-self python -m baselines.run --alg=ppo2 --env=BreakoutNoFrameskip-v4 --save_interval=50 --custom_reward pytorch --custom_reward_path learned_models/breakout-SA --num_timesteps=2e7 --self_attention
 ```
 
-### Evaluating the learned PPO policy (in progress)
+### Evaluating the learned PPO policy 
 
 ```
 python evaluateLearnedPolicy_condor.py --env_name breakout --checkpoint breakout/checkpoints/03900
