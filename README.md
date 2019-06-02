@@ -37,13 +37,13 @@ python LearnAtariNoviceSnippetsSortedSelfAttention.py --env_name breakout --mode
 
 
 ```
-OPENAI_LOG_FORMAT='stdout,log,csv,tensorboard' OPENAI_LOGDIR=path_to_logs/breakout-self python -m baselines.run --alg=ppo2 --env=BreakoutNoFrameskip-v4 --save_interval=50 --custom_reward pytorch --custom_reward_path learned_models/breakout --num_timesteps=2e7 
+OPENAI_LOG_FORMAT='stdout,log,csv,tensorboard' OPENAI_LOGDIR=path_to_logs/breakout python -m baselines.run --alg=ppo2 --env=BreakoutNoFrameskip-v4 --save_interval=50 --custom_reward pytorch --custom_reward_path learned_models/breakout --num_timesteps=2e7 
 ```
 
 #### With self attention
 
 ```
-OPENAI_LOG_FORMAT='stdout,log,csv,tensorboard' OPENAI_LOGDIR=path_to_logs/breakout-self python -m baselines.run --alg=ppo2 --env=BreakoutNoFrameskip-v4 --save_interval=50 --custom_reward pytorch --custom_reward_path learned_models/breakout-SA --num_timesteps=2e7 --self_attention
+OPENAI_LOG_FORMAT='stdout,log,csv,tensorboard' OPENAI_LOGDIR=path_to_logs/breakout-SA python -m baselines.run --alg=ppo2 --env=BreakoutNoFrameskip-v4 --save_interval=50 --custom_reward pytorch --custom_reward_path learned_models/breakout-SA --num_timesteps=2e7 --self_attention
 ```
 
 ### Evaluating the learned PPO policy 
