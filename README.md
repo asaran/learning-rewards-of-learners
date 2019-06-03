@@ -51,3 +51,8 @@ OPENAI_LOG_FORMAT='stdout,log,csv,tensorboard' OPENAI_LOGDIR=path_to_logs/breako
 ```
 python evaluateLearnedPolicy_condor.py --env_name breakout --checkpoint breakout/checkpoints/03900
 ```
+
+### Generating Attention Maps
+```
+python VisualizeAtariLearnedReward.py --env_name breakout --reward_net_path learned_models/breakout/model.pth --models_dir . --save_fig_dir viz/
+```
