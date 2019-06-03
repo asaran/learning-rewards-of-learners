@@ -54,5 +54,5 @@ python evaluateLearnedPolicy_condor.py --env_name breakout --checkpoint breakout
 
 ### Generating Attention Maps
 ```
-python VisualizeAtariLearnedReward.py --env_name breakout --reward_net_path learned_models/breakout/model.pth --models_dir . --save_fig_dir viz/
+python VisualizeAtariLearnedReward.py --env_name breakout --reward_net_path learned_models/breakout --models_dir . --save_fig_dir viz/
 ```
