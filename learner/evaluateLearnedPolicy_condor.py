@@ -42,8 +42,8 @@ def evaluate_learned_policy(env_name, tflogdir, checkpoint, rep):
     #agent = RandomAgent(env.action_space)
 
     learning_returns = []
-    model_path = "/scratch/cluster/dsbrown/tflogs/" + env_name + tflogdir + str(rep) + "/checkpoints/" + checkpoint
-    #model_path = "/home/dsbrown/Code/learning-rewards-of-learners/learner/models/spaceinvaders/checkpoints/" + checkpoint
+    #model_path = "/scratch/cluster/asaran/trex-self-attention/learning-rewards-of-learners/learner/" + env_name + tflogdir + str(rep) + "/checkpoints/" + checkpoint
+    model_path = "/scratch/cluster/asaran/trex-self-attention/learning-rewards-of-learners/learner/path_to_logs/" + checkpoint
     print(model_path)
 
     agent.load(model_path)
@@ -106,7 +106,9 @@ if __name__=="__main__":
     print("*"*10)
     returns = evaluate_learned_policy(env_name, tflogdir, checkpoint, rep)
     #write returns to file
-    f = open("./eval/" + env_name + tflogdir + checkpoint + "_" + rep + "eval.txt",'w')
+    #f = open("./eval/" + env_name + tflogdir + checkpoint + "_" + rep + "eval.txt",'w')
+    f = open("./eval/" + env_name + checkpoint.split('/')[0] + "_" + rep + "eval.txt",'w')
     for r in returns:
         f.write("{}\n".format(r))
     f.close()
+    print('avg score: ',sum(returns)/10.0)
