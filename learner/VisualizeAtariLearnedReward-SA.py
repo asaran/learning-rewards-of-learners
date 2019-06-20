@@ -14,6 +14,7 @@ from run_test import *
 import matplotlib.pylab as plt
 import argparse
 import math, copy, time
+import cv2
 
 parser = argparse.ArgumentParser(description=None)
 parser.add_argument('--env_name', default='', help='Select the environment name to run, i.e. pong')
@@ -151,7 +152,7 @@ class SublayerConnection(nn.Module):
 
 
 class MultiHeadedAttention(nn.Module):
-    def __init__(self, h, d_model, dropout=0.1):
+    def __init__(self, h, d_model, dropout=0.1, viz_heads=False):
         "Take in model size and number of heads."
         super(MultiHeadedAttention, self).__init__()
         # assert d_model % h == 0
@@ -161,6 +162,9 @@ class MultiHeadedAttention(nn.Module):
         self.linears = clones(nn.Linear(d_model, d_model), 4)
         self.attn = None
         self.dropout = nn.Dropout(p=dropout)
+        self.ct = 0
+        self.viz_heads = viz_heads
+        print('viz_heads: '+str(self.viz_heads))
         
     def forward(self, query, key, value, mask=None):
         "Implements Figure 2"
@@ -177,6 +181,29 @@ class MultiHeadedAttention(nn.Module):
         
         # 2) Apply attention on all the projected vectors in batch. 
         x, self.attn = attention(query, key, value, mask=mask, dropout=self.dropout)
+
+        # print attention heads
+        if(self.viz_heads):
+            self.ct += 1
+            top_k = 20
+            for hd_i in range(self.h):
+                print('frame ', self.ct, ' HEAD:',hd_i)#, self.attn[0][hd_i].shape)
+                outfile = open('viz-SA/heads/f'+str(self.ct)+'_h'+str(hd_i)+'.txt','w')
+                width = self.attn[0][hd_i].shape[-1]
+                vals, idxes = torch.topk(self.attn[0][hd_i].view(-1),top_k)
+                for k in range(top_k):
+                    idx = idxes[k].item()
+                    i = idx // width
+                    j = idx % width
+                    #print(i, j, vals[k].item())
+                    ix = i // 8
+                    iy = i % 8
+                    jx = j // 8
+                    jy = j % 8
+                    entry = '['+str((ix,iy))+','+str((jx,jy))+','+str(vals[k].item())+']\n'
+                    print(entry)
+                    outfile.write(entry)
+                outfile.close()
         
         # 3) "Concat" using a view and apply a final linear. 
         x = x.transpose(1, 2).contiguous() \
@@ -263,7 +290,7 @@ class ImageEncoder(nn.Module):
         return output
 
 class Net(nn.Module):
-    def __init__(self):
+    def __init__(self, viz_heads=False):
         super().__init__()
 
         d_model=32 #? or 49?
@@ -275,9 +302,10 @@ class Net(nn.Module):
         ndf=64
         hn=30
         num_actions=1
+        self.viz_heads = viz_heads
 
         c = copy.deepcopy
-        self.attn = MultiHeadedAttention(num_heads, embedding_channels)
+        self.attn = MultiHeadedAttention(num_heads, embedding_channels, viz_heads=viz_heads)
         self.ff = PositionwiseFeedForward(embedding_channels, d_ff, dropout)
 
         self.model = nn.Sequential(ImageEncoder(embedding_channels, c(self.attn), c(self.ff), dropout, hn=hn), FullyConnected(nc=nc, ndf=ndf, num_actions=num_actions)).to(device)
@@ -464,8 +492,8 @@ for checkpoint in checkpoints_demos:
 
         demonstrations.append(traj)
         learning_returns_demos.append(acc_reward)
-        pred_returns_demos.append(reward.cum_return(torch.from_numpy(np.array(traj)).float().to(device))[0].item())
-        print("pred return", pred_returns_demos[-1])
+        # pred_returns_demos.append(reward.cum_return(torch.from_numpy(np.array(traj)).float().to(device))[0].item())
+        # print("pred return", pred_returns_demos[-1])
 
 learning_returns_extrapolate = []
 pred_returns_extrapolate = []
@@ -528,30 +556,30 @@ def convert_range(x,minimum, maximum,a,b):
 # In[12]:
 
 
-buffer = 20
-if env_name == "pong":
-    buffer = 2
-import matplotlib.pylab as pylab
-params = {'legend.fontsize': 'xx-large',
-         # 'figure.figsize': (6, 5),
-         'axes.labelsize': 'xx-large',
-         'axes.titlesize':'xx-large',
-         'xtick.labelsize':'xx-large',
-         'ytick.labelsize':'xx-large'}
-pylab.rcParams.update(params)
-learning_returns_all = learning_returns_demos + learning_returns_extrapolate
-pred_returns_all = pred_returns_demos + pred_returns_extrapolate
-print(pred_returns_all)
-print(learning_returns_all)
-plt.plot(learning_returns_extrapolate, [convert_range(p,max(pred_returns_all), min(pred_returns_all),max(learning_returns_all), min(learning_returns_all)) for p in pred_returns_extrapolate],'bo')
-plt.plot(learning_returns_demos, [convert_range(p,max(pred_returns_all), min(pred_returns_all),max(learning_returns_all), min(learning_returns_all)) for p in pred_returns_demos],'ro')
-plt.plot([min(0, min(learning_returns_all)-2),max(learning_returns_all) + buffer],[min(0, min(learning_returns_all)-2),max(learning_returns_all) + buffer],'g--')
-plt.plot([min(0, min(learning_returns_all)-2),max(learning_returns_demos)],[min(0, min(learning_returns_all)-2),max(learning_returns_demos)],'k-', linewidth=2)
-plt.axis([min(0, min(learning_returns_all)-2),max(learning_returns_all) + buffer,min(0, min(learning_returns_all)-2),max(learning_returns_all)+buffer])
-plt.xlabel("Ground Truth Returns")
-plt.ylabel("Predicted Returns (normalized)")
-plt.tight_layout()
-plt.savefig(save_fig_dir + "/" + env_name + "_gt_vs_pred_rewards.png")
+# buffer = 20
+# if env_name == "pong":
+#     buffer = 2
+# import matplotlib.pylab as pylab
+# params = {'legend.fontsize': 'xx-large',
+#          # 'figure.figsize': (6, 5),
+#          'axes.labelsize': 'xx-large',
+#          'axes.titlesize':'xx-large',
+#          'xtick.labelsize':'xx-large',
+#          'ytick.labelsize':'xx-large'}
+# pylab.rcParams.update(params)
+# learning_returns_all = learning_returns_demos + learning_returns_extrapolate
+# pred_returns_all = pred_returns_demos + pred_returns_extrapolate
+# print(pred_returns_all)
+# print(learning_returns_all)
+# plt.plot(learning_returns_extrapolate, [convert_range(p,max(pred_returns_all), min(pred_returns_all),max(learning_returns_all), min(learning_returns_all)) for p in pred_returns_extrapolate],'bo')
+# plt.plot(learning_returns_demos, [convert_range(p,max(pred_returns_all), min(pred_returns_all),max(learning_returns_all), min(learning_returns_all)) for p in pred_returns_demos],'ro')
+# plt.plot([min(0, min(learning_returns_all)-2),max(learning_returns_all) + buffer],[min(0, min(learning_returns_all)-2),max(learning_returns_all) + buffer],'g--')
+# plt.plot([min(0, min(learning_returns_all)-2),max(learning_returns_demos)],[min(0, min(learning_returns_all)-2),max(learning_returns_demos)],'k-', linewidth=2)
+# plt.axis([min(0, min(learning_returns_all)-2),max(learning_returns_all) + buffer,min(0, min(learning_returns_all)-2),max(learning_returns_all)+buffer])
+# plt.xlabel("Ground Truth Returns")
+# plt.ylabel("Predicted Returns (normalized)")
+# plt.tight_layout()
+# plt.savefig(save_fig_dir + "/" + env_name + "_gt_vs_pred_rewards.png")
 
 #plt.axis('square')
 
@@ -559,93 +587,93 @@ plt.savefig(save_fig_dir + "/" + env_name + "_gt_vs_pred_rewards.png")
 # In[30]:
 
 
-print(learning_returns_all)
-returns_to_plot = sorted([np.random.choice(learning_returns_all) for _ in range(3)])
-demos_to_plot = []
-for r in returns_to_plot:
-    print("searching for", r)
-    for i,d in enumerate(demonstrations):
-        if learning_returns_all[i] == r:
-            print(learning_returns_all[i])
-            demos_to_plot.append(d)
-            break
-print(returns_to_plot)
-print(len(demos_to_plot))
+# print(learning_returns_all)
+# returns_to_plot = sorted([np.random.choice(learning_returns_all) for _ in range(3)])
+# demos_to_plot = []
+# for r in returns_to_plot:
+#     print("searching for", r)
+#     for i,d in enumerate(demonstrations):
+#         if learning_returns_all[i] == r:
+#             print(learning_returns_all[i])
+#             demos_to_plot.append(d)
+#             break
+# print(returns_to_plot)
+# print(len(demos_to_plot))
 
 
 
-# import matplotlib.pylab as pylab
-# params = {'legend.fontsize': 'xx-large',
-#           #'figure.figsize': (15, 5),
-#          'axes.labelsize': 'xx-large',
-#          'axes.titlesize':'xx-large',
-#          'xtick.labelsize':'xx-large',
-#          'ytick.labelsize':'xx-large'}
-# pylab.rcParams.update(params)
-#print out the actual time series of rewards predicted by nnet for each trajectory.
-cnt = 0
-with torch.no_grad():
-    d = demos_to_plot[0]
-    plt.figure(2)
-    rewards = []
-    print(cnt)
-    cnt += 1
-    for s in d:
-        r = reward.cum_return(torch.from_numpy(np.array([s])).float().to(device))[0].item()
-        #print(r)
-        rewards.append(r)
-    plt.ylabel("reward")
-    plt.plot(rewards[2:-1])
-    plt.xlabel("time")
+# # import matplotlib.pylab as pylab
+# # params = {'legend.fontsize': 'xx-large',
+# #           #'figure.figsize': (15, 5),
+# #          'axes.labelsize': 'xx-large',
+# #          'axes.titlesize':'xx-large',
+# #          'xtick.labelsize':'xx-large',
+# #          'ytick.labelsize':'xx-large'}
+# # pylab.rcParams.update(params)
+# #print out the actual time series of rewards predicted by nnet for each trajectory.
+# cnt = 0
+# with torch.no_grad():
+#     d = demos_to_plot[0]
+#     plt.figure(2)
+#     rewards = []
+#     print(cnt)
+#     cnt += 1
+#     for s in d:
+#         r = reward.cum_return(torch.from_numpy(np.array([s])).float().to(device))[0].item()
+#         #print(r)
+#         rewards.append(r)
+#     plt.ylabel("reward")
+#     plt.plot(rewards[2:-1])
+#     plt.xlabel("time")
 
-    plt.title("GT Return = {}".format(returns_to_plot[0]))
+#     plt.title("GT Return = {}".format(returns_to_plot[0]))
 
-#plt.savefig("learned_mcar_return.png")
-    plt.tight_layout()
-    plt.savefig(save_fig_dir + "/" + env_name + "_" + str(returns_to_plot[0]) + "_RewardPlots.png")
+# #plt.savefig("learned_mcar_return.png")
+#     plt.tight_layout()
+#     plt.savefig(save_fig_dir + "/" + env_name + "_" + str(returns_to_plot[0]) + "_RewardPlots.png")
 
-with torch.no_grad():
-    d = demos_to_plot[1]
-    plt.figure(3)
-    rewards = []
-    print(cnt)
-    cnt += 1
-    for s in d:
-        r = reward.cum_return(torch.from_numpy(np.array([s])).float().to(device))[0].item()
-        #print(r)
-        rewards.append(r)
-    plt.ylabel("reward")
-    plt.plot(rewards[2:-1])
-    plt.xlabel("time")
+# with torch.no_grad():
+#     d = demos_to_plot[1]
+#     plt.figure(3)
+#     rewards = []
+#     print(cnt)
+#     cnt += 1
+#     for s in d:
+#         r = reward.cum_return(torch.from_numpy(np.array([s])).float().to(device))[0].item()
+#         #print(r)
+#         rewards.append(r)
+#     plt.ylabel("reward")
+#     plt.plot(rewards[2:-1])
+#     plt.xlabel("time")
 
-    plt.title("GT Return = {}".format(returns_to_plot[1]))
+#     plt.title("GT Return = {}".format(returns_to_plot[1]))
 
-#plt.savefig("learned_mcar_return.png")
-    plt.tight_layout()
-    plt.savefig(save_fig_dir + "/" + env_name + "_" + str(returns_to_plot[1]) + "_RewardPlots.png")
+# #plt.savefig("learned_mcar_return.png")
+#     plt.tight_layout()
+#     plt.savefig(save_fig_dir + "/" + env_name + "_" + str(returns_to_plot[1]) + "_RewardPlots.png")
 
 
-with torch.no_grad():
-    d = demos_to_plot[2]
-    plt.figure(4)
-    rewards = []
-    print(cnt)
-    cnt += 1
-    for s in d:
-        r = reward.cum_return(torch.from_numpy(np.array([s])).float().to(device))[0].item()
-        #print(r)
-        rewards.append(r)
-    plt.ylabel("reward")
-    plt.plot(rewards[2:-1])
-    plt.xlabel("time")
+# with torch.no_grad():
+#     d = demos_to_plot[2]
+#     plt.figure(4)
+#     rewards = []
+#     print(cnt)
+#     cnt += 1
+#     for s in d:
+#         r = reward.cum_return(torch.from_numpy(np.array([s])).float().to(device))[0].item()
+#         #print(r)
+#         rewards.append(r)
+#     plt.ylabel("reward")
+#     plt.plot(rewards[2:-1])
+#     plt.xlabel("time")
 
-    plt.title("GT Return = {}".format(returns_to_plot[2]))
+#     plt.title("GT Return = {}".format(returns_to_plot[2]))
 
-#plt.savefig("learned_mcar_return.png")
-    plt.tight_layout()
-    plt.savefig(save_fig_dir + "/" + env_name + "_" + str(returns_to_plot[2]) + "_RewardPlots.png")
+# #plt.savefig("learned_mcar_return.png")
+#     plt.tight_layout()
+#     plt.savefig(save_fig_dir + "/" + env_name + "_" + str(returns_to_plot[2]) + "_RewardPlots.png")
 
-#plt.show()
+# #plt.show()
 
 
 
@@ -668,7 +696,9 @@ with torch.no_grad():
                 max_frame_i = i+2
 
 
-
+reward2 = Net(viz_heads=True)
+reward2.load_state_dict(torch.load(reward_net_path))
+reward2.to(device)
 
 
 
@@ -686,7 +716,8 @@ def gen_attention_maps(frames, mask_size):
     _,height,width,channels = orig_frame.shape
 
     #find reward without any masking once
-    r_before = reward.cum_return(torch.from_numpy(np.array([orig_frame])).float().to(device))[0].item()
+
+    r_before = reward2.cum_return(torch.from_numpy(np.array([orig_frame])).float().to(device))[0].item()
     heat_maps = []
     for c in range(4): #four stacked frame channels
         delta_heat = np.zeros((height, width))
@@ -708,108 +739,122 @@ mask_size = 3
 delta_heat_max = gen_attention_maps(max_frame, mask_size)
 delta_heat_min = gen_attention_maps(min_frame, mask_size)
 
-
-# In[45]:
-
+# cv2.imwrite("viz-SA/"+env_name + "max_frame.png", max_frame[0][:,:,0])
+# cv2.imwrite("viz-SA/"+env_name + "min_frame.png", min_frame[0][:,:,0])
 
 plt.figure(5)
-for cnt in range(4):
-    plt.subplot(1,4,cnt+1)
-    plt.imshow(delta_heat_max[cnt],cmap='seismic', interpolation='nearest')
-    plt.axis('off')
+plt.axis('off')
+plt.imshow(max_frame[0][:,:,0])
 plt.tight_layout()
-plt.savefig(save_fig_dir + "/" + env_name + "max_attention.png", bbox_inches='tight')
-#plt.show()
-#plt.title("max frame")
-#plt.savefig("/home/dsbrown/Pictures/scott_berkeley/" + env_name + "_attention_maxframes.png", bbox_inches='tight')
-
-
-# In[40]:
+plt.savefig("viz-SA/"+env_name + "max_frame.png", bbox_inches='tight')
 
 plt.figure(6)
-print(max_frame_i)
-print(max_reward)
-for cnt in range(4):
-    plt.subplot(1,4,cnt+1)
-    plt.imshow(max_frame[0][:,:,cnt])
-    plt.axis('off')
+plt.axis('off')
+plt.imshow(min_frame[0][:,:,0])
 plt.tight_layout()
-plt.savefig(save_fig_dir + "/" + env_name + "max_frames.png", bbox_inches='tight')
-#plt.savefig("/home/dsbrown/Pictures/scott_berkeley/" + env_name + "_maxframes.png", bbox_inches='tight')
-#plt.savefig("/home/dsbrown/Code/learning-rewards-of-learners/learner/figs/" + env_name + "_maxreward_obs.png")
-#plt.figure(2)
-#plt.imshow(demonstrations[0][max_frame_i-5][0][:,:,0])
-#plt.show()
+plt.savefig("viz-SA/"+env_name + "min_frame.png", bbox_inches='tight')
+
+# # In[45]:
 
 
-# In[46]:
-
-plt.figure(7)
-for cnt in range(4):
-    plt.subplot(1,4,cnt+1)
-    plt.imshow(delta_heat_min[cnt],cmap='seismic', interpolation='nearest')
-    plt.axis('off')
-plt.tight_layout()
-plt.savefig(save_fig_dir + "/" + env_name + "min_attention.png", bbox_inches='tight')
-#plt.title("min frame")
-#plt.savefig("/home/dsbrown/Pictures/scott_berkeley/" + env_name + "_attention_minframes.png", bbox_inches='tight')
-
-
-# In[42]:
+# plt.figure(5)
+# for cnt in range(4):
+#     plt.subplot(1,4,cnt+1)
+#     plt.imshow(delta_heat_max[cnt],cmap='seismic', interpolation='nearest')
+#     plt.axis('off')
+# plt.tight_layout()
+# plt.savefig(save_fig_dir + "/" + env_name + "max_attention.png", bbox_inches='tight')
+# #plt.show()
+# #plt.title("max frame")
+# #plt.savefig("/home/dsbrown/Pictures/scott_berkeley/" + env_name + "_attention_maxframes.png", bbox_inches='tight')
 
 
-print(min_frame_i)
-print(min_reward)
-plt.figure(8)
-for cnt in range(4):
-    plt.subplot(1,4,cnt+1)
-    plt.imshow(min_frame[0][:,:,cnt])
-    plt.axis('off')
-plt.tight_layout()
-plt.savefig(save_fig_dir + "/" + env_name + "min_frames.png", bbox_inches='tight')
-#plt.savefig("/home/dsbrown/Pictures/scott_berkeley/" + env_name + "_minframes.png", bbox_inches='tight')
-#plt.savefig("/home/dsbrown/Code/learning-rewards-of-learners/learner/figs/" + env_name + "_minreward_obs.png")
-#plt.figure(2)
-#plt.imshow(demonstrations[0][max_frame_i-5][0][:,:,0])
-#plt.show()
+# # In[40]:
+
+# plt.figure(6)
+# print(max_frame_i)
+# print(max_reward)
+# for cnt in range(4):
+#     plt.subplot(1,4,cnt+1)
+#     plt.imshow(max_frame[0][:,:,cnt])
+#     plt.axis('off')
+# plt.tight_layout()
+# plt.savefig(save_fig_dir + "/" + env_name + "max_frames.png", bbox_inches='tight')
+# #plt.savefig("/home/dsbrown/Pictures/scott_berkeley/" + env_name + "_maxframes.png", bbox_inches='tight')
+# #plt.savefig("/home/dsbrown/Code/learning-rewards-of-learners/learner/figs/" + env_name + "_maxreward_obs.png")
+# #plt.figure(2)
+# #plt.imshow(demonstrations[0][max_frame_i-5][0][:,:,0])
+# #plt.show()
 
 
-# In[54]:
+# # In[46]:
+
+# plt.figure(7)
+# for cnt in range(4):
+#     plt.subplot(1,4,cnt+1)
+#     plt.imshow(delta_heat_min[cnt],cmap='seismic', interpolation='nearest')
+#     plt.axis('off')
+# plt.tight_layout()
+# plt.savefig(save_fig_dir + "/" + env_name + "min_attention.png", bbox_inches='tight')
+# #plt.title("min frame")
+# #plt.savefig("/home/dsbrown/Pictures/scott_berkeley/" + env_name + "_attention_minframes.png", bbox_inches='tight')
 
 
-#random frame heatmap
-d_rand = np.random.randint(len(demonstrations))
-f_rand = np.random.randint(len(demonstrations[d_rand]))
-rand_frames = demonstrations[d_rand][f_rand]
+# # In[42]:
 
 
-# In[55]:
-
-plt.figure(9)
-for cnt in range(4):
-    plt.subplot(1,4,cnt+1)
-    plt.imshow(rand_frames[0][:,:,cnt])
-    plt.axis('off')
-plt.tight_layout()
-plt.savefig(save_fig_dir + "/" + env_name + "random_frames.png", bbox_inches='tight')
-#plt.savefig("/home/dsbrown/Pictures/scott_berkeley/" + env_name + "_randframes.png", bbox_inches='tight')
-#plt.savefig("/home/dsbrown/Code/learning-rewards-of-learners/learner/figs/" + env_name + "_minreward_obs.png")
-#plt.figure(2)
-#plt.imshow(demonstrations[0][max_frame_i-5][0][:,:,0])
-#plt.show()
-
-
-# In[56]:
+# print(min_frame_i)
+# print(min_reward)
+# plt.figure(8)
+# for cnt in range(4):
+#     plt.subplot(1,4,cnt+1)
+#     plt.imshow(min_frame[0][:,:,cnt])
+#     plt.axis('off')
+# plt.tight_layout()
+# plt.savefig(save_fig_dir + "/" + env_name + "min_frames.png", bbox_inches='tight')
+# #plt.savefig("/home/dsbrown/Pictures/scott_berkeley/" + env_name + "_minframes.png", bbox_inches='tight')
+# #plt.savefig("/home/dsbrown/Code/learning-rewards-of-learners/learner/figs/" + env_name + "_minreward_obs.png")
+# #plt.figure(2)
+# #plt.imshow(demonstrations[0][max_frame_i-5][0][:,:,0])
+# #plt.show()
 
 
-delta_heat_rand = gen_attention_maps(rand_frames, mask_size)
-plt.figure(10)
-for cnt in range(4):
-    plt.subplot(1,4,cnt+1)
-    plt.imshow(delta_heat_rand[cnt],cmap='seismic', interpolation='nearest')
-    plt.axis('off')
-plt.tight_layout()
-#plt.colorbar()
-plt.savefig(save_fig_dir + "/" + env_name + "random_attention.png", bbox_inches='tight')
+# # In[54]:
+
+
+# #random frame heatmap
+# d_rand = np.random.randint(len(demonstrations))
+# f_rand = np.random.randint(len(demonstrations[d_rand]))
+# rand_frames = demonstrations[d_rand][f_rand]
+
+
+# # In[55]:
+
+# plt.figure(9)
+# for cnt in range(4):
+#     plt.subplot(1,4,cnt+1)
+#     plt.imshow(rand_frames[0][:,:,cnt])
+#     plt.axis('off')
+# plt.tight_layout()
+# plt.savefig(save_fig_dir + "/" + env_name + "random_frames.png", bbox_inches='tight')
+# #plt.savefig("/home/dsbrown/Pictures/scott_berkeley/" + env_name + "_randframes.png", bbox_inches='tight')
+# #plt.savefig("/home/dsbrown/Code/learning-rewards-of-learners/learner/figs/" + env_name + "_minreward_obs.png")
+# #plt.figure(2)
+# #plt.imshow(demonstrations[0][max_frame_i-5][0][:,:,0])
+# #plt.show()
+
+
+# # In[56]:
+
+
+# delta_heat_rand = gen_attention_maps(rand_frames, mask_size)
+# plt.figure(10)
+# for cnt in range(4):
+#     plt.subplot(1,4,cnt+1)
+#     plt.imshow(delta_heat_rand[cnt],cmap='seismic', interpolation='nearest')
+#     plt.axis('off')
+# plt.tight_layout()
+# #plt.colorbar()
+# plt.savefig(save_fig_dir + "/" + env_name + "random_attention.png", bbox_inches='tight')
 #plt.title("max frame")
 #plt.savefig("/home/dsbrown/Pictures/scott_berkeley/" + env_name + "_attention_randframes.png", bbox_inches='tight')

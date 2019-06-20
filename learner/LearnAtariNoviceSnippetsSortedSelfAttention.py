@@ -260,6 +260,7 @@ class MultiHeadedAttention(nn.Module):
         self.attn = None
         self.dropout = nn.Dropout(p=dropout)
         
+        
     def forward(self, query, key, value, mask=None):
         "Implements Figure 2"
         #print('MHA')
@@ -275,6 +276,7 @@ class MultiHeadedAttention(nn.Module):
         
         # 2) Apply attention on all the projected vectors in batch. 
         x, self.attn = attention(query, key, value, mask=mask, dropout=self.dropout)
+
         
         # 3) "Concat" using a view and apply a final linear. 
         x = x.transpose(1, 2).contiguous() \
