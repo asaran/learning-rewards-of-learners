@@ -366,4 +366,3 @@ def read_gaze_file(game_file):
             lines = f.readlines()
     lines = [x.strip() for x in lines] 
     return lines
-        

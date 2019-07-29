@@ -496,6 +496,8 @@ if __name__=="__main__":
     print(len(demonstrations))
     # print([a[0] for a in zip(learning_returns, demonstrations)])
     #sort them based on human preferences
+    # TODO: ******** why are we not sorting human demo trajectories??? ************
+    # Ans: trajectory episodes already being sorted in 
     # demonstrations = [x for _, x in sorted(zip(learning_returns,demonstrations), key=lambda pair: pair[0])]
 
     # sorted_returns = sorted(learning_returns)
