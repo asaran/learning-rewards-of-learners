@@ -4,3 +4,7 @@ models/
 eval/*
 learned_models/*
 gym/*
+viz-SA/*
+viz_no-gaze/*
+viz/*
+*.ods
