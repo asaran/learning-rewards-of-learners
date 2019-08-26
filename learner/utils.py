@@ -4,6 +4,8 @@ import csv
 import os
 import torch
 from os import path, listdir
+import gaze_heatmap as gh
+
 cv2.ocl.setUseOpenCL(False)
 
 def normalize_state(obs):
@@ -148,27 +150,27 @@ def CreateGazeMap(gaze_coords, pic):
 
     return obs
 
-def MaxSkipGaze(gaze,  trajectory_dir):
+def MaxSkipGaze(gaze,  trajectory_dir, heatmap_size):
     """take a list of gaze coordinates and max over every 3rd and 4th observation"""
     num_frames = len(gaze)
     # print('total gaze items: ', num_frames)
     skip=4
-    width, height = 7,7
     sample_pic = np.random.choice(listdir(trajectory_dir))
     image_path = path.join(trajectory_dir, sample_pic)
     pic = cv2.imread(image_path)
-    pic_small = cv2.resize(pic, (width, height), interpolation=cv2.INTER_AREA)
+    pic_small = cv2.resize(pic, (heatmap_size, heatmap_size), interpolation=cv2.INTER_AREA)
     pic_small = cv2.cvtColor(pic_small, cv2.COLOR_BGR2GRAY)
     obs_buffer = np.zeros((2,)+pic_small.shape, dtype=np.uint8)
     max_frames = []
     for i in range(num_frames):
         g = gaze[i]
+        g = np.squeeze(g)
         if i % skip == skip - 2:
-            obs = CreateGazeMap(g, pic)
-            obs_buffer[0] = obs
+            # obs = CreateGazeMap(g, pic)
+            obs_buffer[0] = g
         if i % skip == skip - 1:
-            obs = CreateGazeMap(g, pic)
-            obs_buffer[1] = obs
+            # obs = CreateGazeMap(g, pic)
+            obs_buffer[1] = g
             image = obs_buffer.max(axis=0)
             max_frames.append(image)
     # print('num gaze frames: ', len(max_frames))
@@ -178,11 +180,11 @@ def MaxSkipGaze(gaze,  trajectory_dir):
             
     return max_frames
 
-def StackGaze(gaze_frames):
+def CollapseGaze(gaze_frames, heatmap_size):
     import copy
     """combine every four frames to make an observation (84,84)"""
     stacked = []
-    stacked_obs = np.zeros((7,7))
+    stacked_obs = np.zeros((heatmap_size,heatmap_size))
     for i in range(len(gaze_frames)):
         if i >= 3:
             # Sum over the gaze frequency counts across four frames
@@ -192,15 +194,36 @@ def StackGaze(gaze_frames):
             stacked_obs = stacked_obs + gaze_frames[i]
 
             # Normalize the gaze mask
-            # print(stacked_obs.shape)
             max_gaze_freq = np.amax(stacked_obs)
             stacked_obs = normalize(stacked_obs, max_gaze_freq)
 
             stacked.append(np.expand_dims(copy.deepcopy(stacked_obs),0)) # shape: (1,7,7)
 
-    if np.isnan(stacked).any():
-        print('nan stacked gaze map created')
-        exit(1)
+    # if np.isnan(stacked).any():
+    #     print('nan stacked gaze map created')
+    #     exit(1)
+    return stacked
+
+
+def StackGaze(gaze_frames, heatmap_size):
+    import copy
+    """combine every four frames to make an observation (84,84)"""
+    stacked = []
+    # stacked_obs = np.zeros((7,7))
+    stacked_obs = np.zeros((heatmap_size,heatmap_size,4))
+    for i in range(len(gaze_frames)):
+        if i >= 3:
+            # Sum over the gaze frequency counts across four frames
+            stacked_obs[:,:,0] = gaze_frames[i-3]
+            stacked_obs[:,:,1] = gaze_frames[i-2]
+            stacked_obs[:,:,2] = gaze_frames[i-1]
+            stacked_obs[:,:,3] = gaze_frames[i]
+
+            stacked.append(np.expand_dims(copy.deepcopy(stacked_obs),0)) # shape: (1,7,7)
+
+    # if np.isnan(stacked).any():
+    #     print('nan stacked gaze map created')
+    #     exit(1)
     return stacked
 
 def MaxSkipReward(rewards):
@@ -325,7 +348,11 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, mask_sc
     human_scores = []
     human_demos = []
     human_rewards = []
-    human_gaze = []
+    # human_gaze = []
+    human_gaze_26 = []
+    human_gaze_11 = []
+    human_gaze_7 = []
+
     # img_frames = []
     print('len demos: ',len(demos))
     for indx, score, img_dir, rew, gaze, frame in demos:
@@ -351,14 +378,28 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, mask_sc
         human_rewards.append(stacked_reward)
 
         if(use_gaze):
+            # generate gaze heatmaps as per Ruohan's algorithm
+            h = gh.DatasetWithHeatmap()
+            g_26 = h.createGazeHeatmap(gaze, 26)
+            g_11 = h.createGazeHeatmap(gaze, 11)
+            g_7 = h.createGazeHeatmap(gaze, 7)
+
             # skip and stack gaze
-            maxed_gaze = MaxSkipGaze(gaze, traj_dir)
-            stacked_gaze = StackGaze(maxed_gaze)
-            human_gaze.append(stacked_gaze)
+            maxed_gaze_26 = MaxSkipGaze(g_26, traj_dir, 26)
+            stacked_gaze_26 = CollapseGaze(maxed_gaze_26, 26)
+            human_gaze_26.append(stacked_gaze_26)
+
+            maxed_gaze_11 = MaxSkipGaze(g_11, traj_dir, 11)
+            stacked_gaze_11 = CollapseGaze(maxed_gaze_11, 11)
+            human_gaze_11.append(stacked_gaze_11)
+
+            maxed_gaze_7 = MaxSkipGaze(g_7, traj_dir, 7)
+            stacked_gaze_7 = CollapseGaze(maxed_gaze_7, 7)
+            human_gaze_7.append(stacked_gaze_7)
 
     if(use_gaze):    
-        print(len(human_demos[0]), len(human_rewards[0]), len(human_gaze[0]))
-    return human_demos, human_scores, human_rewards, human_gaze
+        print(len(human_demos[0]), len(human_rewards[0]), len(human_gaze_26[0]))
+    return human_demos, human_scores, human_rewards, human_gaze_26, human_gaze_11, human_gaze_7
 
 
 def read_gaze_file(game_file):
