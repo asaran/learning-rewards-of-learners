@@ -155,12 +155,12 @@ def MaxSkipGaze(gaze,  trajectory_dir, heatmap_size):
     num_frames = len(gaze)
     # print('total gaze items: ', num_frames)
     skip=4
-    sample_pic = np.random.choice(listdir(trajectory_dir))
-    image_path = path.join(trajectory_dir, sample_pic)
-    pic = cv2.imread(image_path)
-    pic_small = cv2.resize(pic, (heatmap_size, heatmap_size), interpolation=cv2.INTER_AREA)
-    pic_small = cv2.cvtColor(pic_small, cv2.COLOR_BGR2GRAY)
-    obs_buffer = np.zeros((2,)+pic_small.shape, dtype=np.uint8)
+    # sample_pic = np.random.choice(listdir(trajectory_dir))
+    # image_path = path.join(trajectory_dir, sample_pic)
+    # pic = cv2.imread(image_path)
+    # pic_small = cv2.resize(pic, (heatmap_size, heatmap_size), interpolation=cv2.INTER_AREA)
+    # pic_small = cv2.cvtColor(pic_small, cv2.COLOR_BGR2GRAY)
+    obs_buffer = np.zeros((2,)+(heatmap_size,heatmap_size), dtype=np.float32)
     max_frames = []
     for i in range(num_frames):
         g = gaze[i]
@@ -266,7 +266,7 @@ def get_sorted_traj_indices(env_name, dataset):
     #need to pick out a subset of demonstrations based on desired performance
     #first let's sort the demos by performance, we can use the trajectory number to index into the demos so just
     #need to sort indices based on 'score'
-    g = env_name
+    game = env_name
     #Note, I'm also going to try only keeping the full demonstrations that end in terminal
     traj_indices = []
     traj_scores = []
@@ -274,19 +274,19 @@ def get_sorted_traj_indices(env_name, dataset):
     traj_rewards = []
     traj_gaze = []
     traj_frames = []
-    print('traj length: ',len(dataset.trajectories[g]))
-    for t in dataset.trajectories[g]:
+    print('traj length: ',len(dataset.trajectories[game]))
+    for t in dataset.trajectories[game]:
         # if env_name == "revenge":
         #     traj_indices.append(t)
         #     traj_scores.append(dataset.trajectories[g][t][-1]['score'])
 
         # elif dataset.trajectories[g][t][-1]['terminal']:
         traj_indices.append(t)
-        traj_scores.append(dataset.trajectories[g][t][-1]['score'])
-        traj_dirs.append(dataset.trajectories[g][t][-1]['img_dir'])
-        traj_rewards.append([dataset.trajectories[g][t][i]['reward'] for i in range(len(dataset.trajectories[g][t]))])
-        traj_gaze.append([dataset.trajectories[g][t][i]['gaze_positions'] for i in range(len(dataset.trajectories[g][t]))])
-        traj_frames.append([dataset.trajectories[g][t][i]['frame'] for i in range(len(dataset.trajectories[g][t]))])
+        traj_scores.append(dataset.trajectories[game][t][-1]['score'])
+        traj_dirs.append(dataset.trajectories[game][t][-1]['img_dir'])
+        traj_rewards.append([dataset.trajectories[game][t][i]['reward'] for i in range(len(dataset.trajectories[game][t]))])
+        traj_gaze.append([dataset.trajectories[game][t][i]['gaze_positions'] for i in range(len(dataset.trajectories[game][t]))])
+        traj_frames.append([dataset.trajectories[game][t][i]['frame'] for i in range(len(dataset.trajectories[game][t]))])
 
     sorted_traj_indices = [x for _, x in sorted(zip(traj_scores, traj_indices), key=lambda pair: pair[0])]
     sorted_traj_scores = sorted(traj_scores)
