@@ -198,6 +198,7 @@ model_dir = args.models_dir
 demonstrations = []
 learning_returns_demos = []
 pred_returns_demos = []
+
 for checkpoint in checkpoints_demos:
 
     model_path = model_dir + "/models/" + env_name + "_25/" + checkpoint
@@ -236,6 +237,8 @@ for checkpoint in checkpoints_demos:
 
 learning_returns_extrapolate = []
 pred_returns_extrapolate = []
+
+
 
 # for checkpoint in checkpoints_extrapolate:
 

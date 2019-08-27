@@ -57,7 +57,7 @@ def evaluate_learned_policy(env_name, checkpoint, rep):
     print(model_path)
 
     agent.load(model_path)
-    episode_count = 5
+    episode_count = 30
     for i in range(episode_count):
         done = False
         traj = []
@@ -113,6 +113,7 @@ if __name__=="__main__":
     print(env_name)
     print("*"*10)
     returns = evaluate_learned_policy(env_name, checkpoint, rep)
+    print("avg score: ",sum(returns)/len(returns))
     #write returns to file
     #f = open("./eval/" + env_name + "_" + checkpoint + "_" + "eval.txt",'w')
     f = open("./eval/" + checkpoint.split('/')[0] + "_" + "eval.txt",'w')

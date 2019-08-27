@@ -3,10 +3,10 @@ env_names = [['breakout','Breakout'],['hero','Hero'], ['seaquest','Seaquest'], [
 snippet_lengths = ['50','250','500']
 gaze_reg = {'gaze':['0.1', '0.5'],'no_gaze':[]}
 exp_type = ['rewardLearn','PPO','eval']
-traj_sort_type = ['rewards','returns']
+traj_sort_type = ['rewards'] #'returns'
 mask_scores = [['True','mask'], ['False','no-mask']]
 use_gaze = [['True','gaze'],['False','no-gaze']]
-gaze_loss_type = {'gaze':['coverage','EMD'],'no-gaze':[]}
+gaze_loss_type = {'gaze':['coverage'],'no-gaze':[]}  #EMD
 
 gpu = ['0','1','2','3','4','5','6','7']
 i=0
@@ -53,6 +53,8 @@ for exp in exp_type:
                screen_name = env[0]+'_'+exp+'_'+l+'_'+ug[1]+"_"+gl+"_"+m[1]+"_"+t+"_"+g
                #f.write("#!/bin/bash")
                f.write("screen -dmS "+screen_name+" bash\n")
+               f.write("screen -S "+screen_name+" -X stuff \"cd /scratch/cluster/asaran/learning-rewards-of-learners/learner/\n")
+               f.write("\"\n")
                f.write("screen -S "+screen_name+" -X stuff \"source ~/.virtualenv/gym/bin/activate\n")
                f.write("\"\n")
                if(exp=='rewardLearn'):
