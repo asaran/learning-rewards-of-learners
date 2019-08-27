@@ -25,7 +25,7 @@ class DatasetWithHeatmap:
             self.HEATMAP_SHAPE *= 2
         self.GHmap = np.zeros([self.train_size, self.HEATMAP_SHAPE, self.HEATMAP_SHAPE, 1], dtype=np.float32)
         
-        print("Running BIU.convert_gaze_pos_to_heap_map() and convolution...")
+        # print("Running BIU.convert_gaze_pos_to_heap_map() and convolution...")
         t1 = time.time()
         
         bad_count, tot_count = 0, 0
@@ -33,8 +33,8 @@ class DatasetWithHeatmap:
             tot_count += len(self.frameid2pos[fid])
             bad_count += self.convert_gaze_pos_to_heap_map(self.frameid2pos[fid], out=self.GHmap[i])
             
-        print("Bad gaze (x,y) sample: %d (%.2f%%, total gaze sample: %d)" % (bad_count, 100*float(bad_count)/tot_count, tot_count))    
-        print("'Bad' means the gaze position is outside the 160*210 screen")
+        # print("Bad gaze (x,y) sample: %d (%.2f%%, total gaze sample: %d)" % (bad_count, 100*float(bad_count)/tot_count, tot_count))    
+        # print("'Bad' means the gaze position is outside the 160*210 screen")
         
         sigmaH = 28.50 * self.HEATMAP_SHAPE / self.SCR_H
         sigmaW = 44.58 * self.HEATMAP_SHAPE / self.SCR_W
@@ -45,13 +45,19 @@ class DatasetWithHeatmap:
             import scipy.ndimage
             self.GHmap = scipy.ndimage.zoom(self.GHmap, (1, 0.5, 0.5, 1))
 
-        print("Normalizing the heat map...")
+        # print("Normalizing the heat map...")
         for i in range(len(self.GHmap)):
             SUM = self.GHmap[i].sum()
             if SUM != 0:
                 self.GHmap[i] /= SUM
 
-        print("Done. BIU.convert_gaze_pos_to_heap_map() and convolution used: %.1fs" % (time.time()-t1))
+        # print("Done. BIU.convert_gaze_pos_to_heap_map() and convolution used: %.1fs" % (time.time()-t1))
+        print(type(self.GHmap))
+        if np.count_nonzero(self.GHmap):
+            print(gaze_coords)
+            print('The gaze map is all zeros')
+            
+
         return self.GHmap
     
     def get_gaze_data(self, gaze_coords):
@@ -61,14 +67,14 @@ class DatasetWithHeatmap:
             frameid2pos[frame_id] = gaze_list
             frame_id += 1    
 
-        if len(frameid2pos) < 1000: # simple sanity check
-            print ("Warning: did you provide the correct gaze data? Because the data for only %d frames is detected" % (len(frameid2pos)))
+        # if len(frameid2pos) < 1000: # simple sanity check
+        #     print ("Warning: did you provide the correct gaze data? Because the data for only %d frames is detected" % (len(frameid2pos)))
 
         few_cnt = 0
         for v in frameid2pos.values():
             if len(v) < 10: few_cnt += 1
-        print ("Warning:  %d frames have less than 10 gaze samples. (%.1f%%, total frame: %d)" % \
-            (few_cnt, 100.0*few_cnt/len(frameid2pos), len(frameid2pos)))     
+        # print ("Warning:  %d frames have less than 10 gaze samples. (%.1f%%, total frame: %d)" % \
+            # (few_cnt, 100.0*few_cnt/len(frameid2pos), len(frameid2pos)))     
 
         return frameid2pos
 
@@ -109,6 +115,7 @@ class DatasetWithHeatmap:
         
         # print(np.count_nonzero(self.GHmap))
         output=model.predict(self.GHmap, batch_size=500)
+        # print(type(output))
         # print(np.count_nonzero(output))
 
         if debug_plot_result:
