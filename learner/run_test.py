@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import argparse
 import sys
 
@@ -5,7 +6,7 @@ import gym
 from gym import wrappers, logger
 import tensorflow as tf
 
-sys.path.append('./baselines/')
+sys.path.append('../baselines/')
 from baselines.ppo2.model import Model
 from baselines.common.policies import build_policy
 from baselines.common.cmd_util import make_vec_env
