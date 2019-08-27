@@ -384,6 +384,8 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, mask_sc
             g_11 = h.createGazeHeatmap(gaze, 11)
             g_7 = h.createGazeHeatmap(gaze, 7)
 
+            # print('g type: ', type(g_11))
+
             # skip and stack gaze
             maxed_gaze_26 = MaxSkipGaze(g_26, traj_dir, 26)
             stacked_gaze_26 = CollapseGaze(maxed_gaze_26, 26)
@@ -397,6 +399,9 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, mask_sc
             stacked_gaze_7 = CollapseGaze(maxed_gaze_7, 7)
             human_gaze_7.append(stacked_gaze_7)
 
+            # print('maxed gaze type: ',type(maxed_gaze_11)) #list
+            # print('stacked gaze type: ',type(stacked_gaze_11)) #list
+
     if(use_gaze):    
         print(len(human_demos[0]), len(human_rewards[0]), len(human_gaze_26[0]))
     return human_demos, human_scores, human_rewards, human_gaze_26, human_gaze_11, human_gaze_7
@@ -404,6 +409,6 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, mask_sc
 
 def read_gaze_file(game_file):
     with open(game_file) as f:
-            lines = f.readlines()
+        lines = f.readlines()
     lines = [x.strip() for x in lines] 
     return lines

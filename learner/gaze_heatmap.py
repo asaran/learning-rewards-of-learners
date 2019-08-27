@@ -52,9 +52,9 @@ class DatasetWithHeatmap:
                 self.GHmap[i] /= SUM
 
         # print("Done. BIU.convert_gaze_pos_to_heap_map() and convolution used: %.1fs" % (time.time()-t1))
-        print(type(self.GHmap))
-        if np.count_nonzero(self.GHmap):
-            print(gaze_coords)
+        # print(type(self.GHmap))
+        if not np.count_nonzero(self.GHmap):
+            # print(gaze_coords)
             print('The gaze map is all zeros')
             
 

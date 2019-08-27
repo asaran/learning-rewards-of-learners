@@ -20,7 +20,7 @@ class Net(nn.Module):
 		'''calculate cumulative return of trajectory'''
 		sum_rewards = 0
 		sum_abs_rewards = 0
-		for x in traj:
+		for i,x in enumerate(traj):
 			x = x.permute(0,3,1,2) #get into NCHW format
 			#compute forward pass of reward network
 			x = F.leaky_relu(self.conv1(x))
@@ -29,7 +29,7 @@ class Net(nn.Module):
 			# gaze modulated dropout
 			if(self.gaze_dropout):
 				assert(gaze26 is not None)
-				x = self.gaze_modulated_dropout(x, gaze26, train)
+				x = self.gaze_modulated_dropout(x, gaze26[i], train)
 
 			x = F.leaky_relu(self.conv2(x))
 			# print('conv2 shape',x.shape) # [1,16,11,11]
@@ -37,7 +37,7 @@ class Net(nn.Module):
 			# gaze modulated dropout
 			if(self.gaze_dropout):
 				assert(gaze11 is not None)
-				x = self.gaze_modulated_dropout(x, gaze11, train)
+				x = self.gaze_modulated_dropout(x, gaze11[i], train)
 			
 			
 			x = F.leaky_relu(self.conv3(x))
@@ -55,7 +55,7 @@ class Net(nn.Module):
 		return sum_rewards, sum_abs_rewards
 
 
-	def forward(self, traj_i, traj_j, gaze26_i, gaze26_j, gaze11_i, gaze11_j, train=False):
+	def forward(self, traj_i, traj_j, gaze26_i=None, gaze26_j=None, gaze11_i=None, gaze11_j=None, train=False):
 		'''compute cumulative return for each trajectory and return logits'''
 		#print([self.cum_return(traj_i), self.cum_return(traj_j)])
 		cum_r_i, abs_r_i = self.cum_return(traj_i, gaze26_i, gaze11_i, train)
@@ -76,14 +76,14 @@ class Net(nn.Module):
 			# gaze modulated dropout
 			if(self.gaze_dropout):
 				assert(gaze26 is not None)
-				x = self.gaze_modulated_dropout(x, gaze26, train)			
+				x = self.gaze_modulated_dropout(x, gaze26[i], train)			
 
 			x = F.leaky_relu(self.conv2(x))
 			
 			# gaze modulated dropout
 			if(self.gaze_dropout):
 				assert(gaze11 is not None)
-				x = self.gaze_modulated_dropout(x, gaze11, train)
+				x = self.gaze_modulated_dropout(x, gaze11[i], train)
 			
 			x = F.leaky_relu(self.conv3(x))
 			x_final_conv = F.leaky_relu(self.conv4(x))
@@ -123,6 +123,7 @@ class Net(nn.Module):
 		# Iterate over batch size
 		# for i in range(act_shape[0]):
 		# Iterate over each feature map
+		# print('activation shape: ', act_shape) # [1,16,26,26]
 		for j in range(act_shape[1]):
 			
 			# randomly sample array from a discrete uniform distribution between 0 & 1
@@ -136,30 +137,33 @@ class Net(nn.Module):
 			# interpolate the gaze map to the shape of the activation
 			# keep-probability mask K
 			K = gaze_map
-			print(len(K))
-			print(K[0])
+			# print(len(K), type(K)) # 50, list
+			# print(K.shape)
 			
 			# Rescale the range of values in K to (1-dp,1) where dp is the dropout probability for uniform dropout
 			# dp = 0.7 worked best for Chen et al.
 			K = (K-(1-dp))/dp
 
 			# Binary mask M=(K>A)
-			# K = torch.from_numpy(K).float().to(device)
+			K = torch.from_numpy(K).float().to(device)
 			# print(K.shape, A.shape) # [20, 20], [20, 20]
 			M = K>A
 			M = M.float()
 
 			curr_activation = conv_activation[:,j,:,:]		
-			curr_activation = curr_activation.squeeze()	
+			# curr_activation = curr_activation.squeeze()	
+			# print(curr_activation.shape, M.shape, K.shape)
 
 			# Apply the mask
 			if train:
 				# multiply with binary mask
 				F = torch.bmm(curr_activation, M)
+				# F = curr_activation*M
 
 			else:
 				# averaging effect at test time
 				F = torch.bmm(curr_activation, K)
+				# F = curr_activation*K
 
 			# Normalize the features
 			F = F/(1-dp)
