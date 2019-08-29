@@ -17,7 +17,9 @@ class DatasetWithHeatmap:
         
     def createGazeHeatmap(self, gaze_coords, heatmap_shape):
         # print("Reading gaze data ASC file, and converting per-frame gaze positions to heat map...")
+        # print(gaze_coords)
         self.frameid2pos = self.get_gaze_data(gaze_coords)
+        # print(self.frameid2pos)
         self.train_size = len(self.frameid2pos.keys())
         self.HEATMAP_SHAPE = heatmap_shape
     
@@ -143,7 +145,8 @@ class DatasetWithHeatmap:
         # for (x,y) in gaze_pos_list: 
         # print(gaze_pos_list)
         # print(len(gaze_pos_list))
-        if(not np.isnan(gaze_pos_list).all()):    
+        # if(not np.isnan(gaze_pos_list).all()): 
+        if not np.isnan(gaze_pos_list).all():
             for j in range(0,len(gaze_pos_list),2):
                 x = gaze_pos_list[j]
                 y = gaze_pos_list[j+1]
