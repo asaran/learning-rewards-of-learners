@@ -233,13 +233,13 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
 
 			#forward + backward + optimize
 			if gaze_dropout:
-				print('forward pass')
+				# print('forward pass')
 				outputs, abs_rewards, conv_map_i, conv_map_j = reward_network.forward(traj_i, traj_j, gaze26_i, gaze26_j, train=True)
 			else:
 				outputs, abs_rewards, _, _ = reward_network.forward(traj_i, traj_j, train=True)			
 			outputs = outputs.unsqueeze(0)
 
-			print('computing loss')
+			# print('computing loss')
 			output_loss = loss_criterion(outputs, labels)
 			# print('output loss: ', output_loss)
 
