@@ -173,15 +173,15 @@ def gaze_loss_coverage(true_gaze, conv_gaze):
 
 # Now we train the network. I'm just going to do it one by one for now. Could adapt it for minibatches to get better gradients
 def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, checkpoint_dir, gaze_loss_type, gaze_reg, gaze_dropout):
-	training_inputs, training_outputs, training_gaze = training_data
+	training_inputs, training_outputs, training_gaze26 = training_data
 
 	# generate all gaze heatmaps here
 	# if gaze_dropout:
-	# 	training_gaze26 = utils.get_gaze_heatmap(training_gaze, 26)
-	# 	training_gaze11 = utils.get_gaze_heatmap(training_gaze, 11)
+	# 	training_gaze26 = utils.get_all_gaze_heatmaps(training_gaze, 26)
+		# training_gaze11 = utils.get_gaze_heatmap(training_gaze, 11)
 
 	# if gaze_loss_type is not None:
-	# 	training_gaze7 = utils.get_gaze_heatmap(training_gaze, 7)
+	# 	training_gaze7 = utils.get_all_gaze_heatmaps(training_gaze, 7)
 
 	# multiplier for gaze loss
 	# gaze_reg = 0.5
@@ -212,9 +212,9 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
 			traj_i, traj_j = training_obs[i]
 			if gaze_dropout:
 				# gaze_coord pairs are in training_gaze[i] for each trajectory
-				gaze_coords_i, gaze_coords_j = training_gaze[i]
+				# gaze_coords_i, gaze_coords_j = training_gaze[i]
 
-				# gaze26_i, gaze26_j = training_gaze26[i]
+				gaze26_i, gaze26_j = training_gaze26[i]
 				# gaze11_i, gaze11_j = training_gaze11[i]
 
 			labels = np.array([[training_labels[i]]])
@@ -234,7 +234,7 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
 			#forward + backward + optimize
 			if gaze_dropout:
 				print('forward pass')
-				outputs, abs_rewards, conv_map_i, conv_map_j = reward_network.forward(traj_i, traj_j, gaze_coords_i, gaze_coords_j, train=True)
+				outputs, abs_rewards, conv_map_i, conv_map_j = reward_network.forward(traj_i, traj_j, gaze26_i, gaze26_j, train=True)
 			else:
 				outputs, abs_rewards, _, _ = reward_network.forward(traj_i, traj_j, train=True)			
 			outputs = outputs.unsqueeze(0)
@@ -249,16 +249,16 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
 			
 			else:
 				# ground truth human gaze maps (7x7)
-				# gaze7_i, gaze7_j = training_gaze7[i]
+				gaze7_i, gaze7_j = training_gaze26[i]
 				# gaze26_i, gaze26_j = training_gaze26[i]
 				# gaze11_i, gaze11_j = training_gaze11[i]
 				
 				# get gaze heatmaps of size 7x7 for a trajectory
-				gaze7_i = utils.get_gaze_heatmap(gaze_coords_i, 7)
-				gaze7_j = utils.get_gaze_heatmap(gaze_coords_j, 7)
+				# gaze7_i = utils.get_gaze_heatmap(gaze_coords_i, 7)
+				# gaze7_j = utils.get_gaze_heatmap(gaze_coords_j, 7)
 
-				# gaze7_i = np.array(gaze7_i)
-				# gaze7_j = np.array(gaze7_j)
+				gaze7_i = np.array(gaze7_i)
+				gaze7_j = np.array(gaze7_j)
 
 				# get normalized conv map output (7x7)
 				# gaze_map_i = reward_network.conv_map(traj_i, gaze7_i, train=True).cpu().detach().numpy()
@@ -299,16 +299,16 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
 
 
 
-def calc_accuracy(reward_network, training_inputs, training_outputs, training_gaze, gaze_dropout):
+def calc_accuracy(reward_network, training_inputs, training_outputs, training_gaze26, gaze_dropout):
 	device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 	# loss_criterion = nn.CrossEntropyLoss()
 	#print(training_data[0])
 	num_correct = 0.
 
-	if gaze_dropout:
-		# training_gaze26 = utils.get_gaze_heatmap(training_gaze, 26)
+	# if gaze_dropout:
+	# 	training_gaze26 = utils.get_all_gaze_heatmaps(training_gaze, 26)
 		# training_gaze11 = utils.get_gaze_heatmap(training_gaze, 11)
-		gaze_coords_i, gaze_coords_j = training_gaze[i]
+		# gaze_coords_i, gaze_coords_j = training_gaze[i]
 
 	with torch.no_grad():
 		for i in range(len(training_inputs)):
@@ -322,10 +322,10 @@ def calc_accuracy(reward_network, training_inputs, training_outputs, training_ga
 			traj_j = torch.from_numpy(traj_j).float().to(device)
 
 			if gaze_dropout:
-				# gaze26_i, gaze26_j = training_gaze26[i]
+				gaze26_i, gaze26_j = training_gaze26[i]
 				# gaze11_i, gaze11_j = training_gaze11[i]
-				gaze_coords_i, gaze_coords_j = training_gaze[i]
-				outputs, _, _ = reward_network.forward(traj_i, traj_j, gaze_coords_i, gaze_coords_j, train=False)
+				# gaze_coords_i, gaze_coords_j = training_gaze[i]
+				outputs, _, _ = reward_network.forward(traj_i, traj_j, gaze26_i, gaze26_j, train=False)
 			else:
 				outputs, _, _ = reward_network.forward(traj_i, traj_j, train=False)
 
@@ -446,7 +446,7 @@ if __name__=="__main__":
 	# dataset = ds.AtariDataset(data_dir)
 	# demonstrations, learning_returns = agc_demos.get_preprocessed_trajectories(agc_env_name, dataset, data_dir)
 	dataset = ahd.AtariHeadDataset(env_name, data_dir)
-	demonstrations, learning_returns, learning_rewards, learning_gaze = utils.get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, mask)
+	demonstrations, learning_returns, learning_rewards, learning_gaze26 = utils.get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, mask)
 
 
 	# Let's plot the returns to see if they are roughly monotonically increasing.
@@ -472,8 +472,8 @@ if __name__=="__main__":
 	#plt.show()
 
 	# training_obs, training_labels, training_gaze = create_training_data(demonstrations, learning_returns, gaze_maps, n_train)
-	training_data  = create_training_data(demonstrations, learning_returns, learning_rewards, learning_gaze, n_train, use_gaze, snippet_length, comp_metric)
-	training_obs, training_labels, training_gaze = training_data
+	training_data  = create_training_data(demonstrations, learning_returns, learning_rewards, learning_gaze26, n_train, use_gaze, snippet_length, comp_metric)
+	training_obs, training_labels, training_gaze26 = training_data
 	print("num training_obs", len(training_obs))
 	print("num_labels", len(training_labels))
 

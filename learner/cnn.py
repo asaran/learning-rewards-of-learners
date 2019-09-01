@@ -19,19 +19,19 @@ class Net(nn.Module):
 		self.gaze_loss_type = gaze_loss_type
 
 
-	def cum_return(self, traj, gaze_coords, train):
+	def cum_return(self, traj, gaze26, train):
 		'''calculate cumulative return of trajectory'''
 		sum_rewards = 0
 		sum_abs_rewards = 0
 		conv_map_traj = []
 		conv_map_stacked = torch.tensor([[]])
 
-		if self.gaze_dropout:
-			gaze26 = get_gaze_heatmap(gaze_coords, 26)
-			gaze11 = get_gaze_heatmap(gaze_coords, 11)	
+		# if self.gaze_dropout:
+		# 	gaze26 = get_gaze_heatmap(gaze_coords, 26)
+			# gaze11 = get_gaze_heatmap(gaze_coords, 11)	
 
-		if self.gaze_loss_type is not None:
-			gaze7 = get_gaze_heatmap(gaze_coords, 7)
+		# if self.gaze_loss_type is not None:
+		# 	gaze7 = get_gaze_heatmap(gaze_coords, 7)
 
 		for i,x in enumerate(traj):
 			x = x.permute(0,3,1,2) #get into NCHW format
@@ -48,9 +48,9 @@ class Net(nn.Module):
 			# print('conv2 shape',x.shape) # [1,16,11,11]
 			
 			# gaze modulated dropout
-			if(self.gaze_dropout):
-				assert(gaze11 is not None)
-				x = self.gaze_modulated_dropout(x, gaze11[i], train)
+			# if(self.gaze_dropout):
+			# 	assert(gaze11 is not None)
+			# 	x = self.gaze_modulated_dropout(x, gaze11[i], train)
 			
 			
 			x = F.leaky_relu(self.conv3(x))
@@ -66,7 +66,7 @@ class Net(nn.Module):
 
 			# prepare conv map to be returned for gaze loss
 			if self.gaze_loss_type is not None:
-				assert(gaze7 is not None)
+				# assert(gaze7_coords is not None)
 				# sum over all dimensions of the conv map
 				conv_map = x_final_conv.sum(dim=1)
 
@@ -83,60 +83,16 @@ class Net(nn.Module):
 		return sum_rewards, sum_abs_rewards, conv_map_stacked
 
 
-	def forward(self, traj_i, traj_j, gaze_coords_i=None, gaze_coords_j=None, train=False):
+	def forward(self, traj_i, traj_j, gaze26_i=None, gaze26_j=None, train=False):
 		'''compute cumulative return for each trajectory and return logits'''
 		#print([self.cum_return(traj_i), self.cum_return(traj_j)])
-		cum_r_i, abs_r_i, conv_map_i = self.cum_return(traj_i, gaze_coords_i, train)
-		cum_r_j, abs_r_j, conv_map_j = self.cum_return(traj_j, gaze_coords_j, train)
+		cum_r_i, abs_r_i, conv_map_i = self.cum_return(traj_i, gaze26_i, train)
+		cum_r_j, abs_r_j, conv_map_j = self.cum_return(traj_j, gaze26_j, train)
 		#print(abs_r_i + abs_r_j)
 		return torch.cat([cum_r_i, cum_r_j]), abs_r_i + abs_r_j, conv_map_i, conv_map_j
 
 
-	def conv_map(self, traj, gaze26, gaze11, train=False):
-		'''calculate cumulative return of trajectory'''
-		# conv_map_traj = torch.zeros([len(traj), traj[0].shape[0], 7, 7], dtype=torch.float64)
-		conv_map_traj = []
-		for i,x in enumerate(traj):
-			x = x.permute(0,3,1,2) #get into NCHW format
-			#compute forward pass of reward network
-			x = F.leaky_relu(self.conv1(x))
-
-			# gaze modulated dropout
-			if(self.gaze_dropout):
-				assert(gaze26 is not None)
-				x = self.gaze_modulated_dropout(x, gaze26[i], train)			
-
-			x = F.leaky_relu(self.conv2(x))
-			
-			# gaze modulated dropout
-			if(self.gaze_dropout):
-				assert(gaze11 is not None)
-				x = self.gaze_modulated_dropout(x, gaze11[i], train)
-			
-			x = F.leaky_relu(self.conv3(x))
-			x_final_conv = F.leaky_relu(self.conv4(x))
-			# print(x_final_conv.shape)
-			# x_final_conv = x_final_conv.squeeze()
-			# print(x_final_conv.shape)
-			x_final_conv = x_final_conv.sum(dim=1) #[batch size, 7, 7], summing all 16 conv filters
-			# x = x.view(-1, 784)
-			# x = F.leaky_relu(self.fc1(x))            
-			# r = self.fc2(x)
-			# print(x_final_conv.shape) # [7,7]
-			# print(type(x_final_conv))
-			# print(torch.min(x_final_conv))
-			# print(torch.max(x_final_conv))
-			min_x = torch.min(x_final_conv)
-			max_x = torch.max(x_final_conv)
-			x_norm = (x_final_conv - min_x)/(max_x - min_x)
-			# print(x_norm)
-			# conv_map_traj[i,:,:,:]=x_norm
-			conv_map_traj.append(x_norm)
-
-		conv_map_stacked = torch.stack(conv_map_traj)
-		return conv_map_stacked
-
-
+	
 	# gaze modulated dropout
 	def gaze_modulated_dropout(self, conv_activation, gaze_map, train):
 		# print('calling gaze modulated dropout')
