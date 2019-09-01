@@ -442,8 +442,8 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, mask_sc
     human_scores = []
     human_demos = []
     human_rewards = []
-    human_gaze = []
-    # human_gaze_26 = []
+    #human_gaze = []
+    human_gaze_26 = []
     # human_gaze_11 = []
     # human_gaze_7 = []
 
@@ -502,8 +502,8 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, mask_sc
             # print('stacked gaze type: ',type(stacked_gaze_11)) #list
 
     if(use_gaze):    
-        print(len(human_demos[0]), len(human_rewards[0]), len(human_gaze[0]))
-        print(len(human_demos), len(human_rewards), len(human_gaze))
+        print(len(human_demos[0]), len(human_rewards[0]), len(human_gaze_26[0]))
+        print(len(human_demos), len(human_rewards), len(human_gaze_26))
     return human_demos, human_scores, human_rewards, human_gaze_26
 
 
