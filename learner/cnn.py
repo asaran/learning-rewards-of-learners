@@ -40,7 +40,7 @@ class Net(nn.Module):
 			# print('conv1 shape',x.shape) # [1,16,26,26]
 
 			# gaze modulated dropout
-			if(self.gaze_dropout):
+			if(self.gaze_dropout and train):
 				assert(gaze26 is not None)
 				x = self.gaze_modulated_dropout(x, gaze26[i], train)
 
