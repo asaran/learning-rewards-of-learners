@@ -42,15 +42,17 @@ def GrayScaleWarpImage(image):
     #frame = np.expand_dims(frame, -1)
     return frame
 
-def MaxSkipAndWarpFrames(trajectory_dir, frames):
+def MaxSkipAndWarpFrames(trajectory_dir, img_dirs, frames):
     """take a trajectory file of frames and max over every 3rd and 4th observation"""
     # num_frames = len(listdir(trajectory_dir))
     num_frames = len(frames)
     # print('total images:', num_frames)
     skip=4
 
-    sample_pic = np.random.choice(listdir(trajectory_dir))
-    image_path = path.join(trajectory_dir, sample_pic)
+    
+    sample_pic = np.random.choice(listdir(path.join(trajectory_dir,img_dirs[0])))
+    image_path = path.join(trajectory_dir, img_dirs[0], sample_pic)
+    # print(image_path)
     pic = cv2.imread(image_path)
     obs_buffer = np.zeros((2,)+pic.shape, dtype=np.uint8)
     max_frames = []
@@ -59,16 +61,17 @@ def MaxSkipAndWarpFrames(trajectory_dir, frames):
         # b = trajectory_dir.split("_")
         # img_name =  "_".join(b[1:3]) + "_" + str(i) + ".png"
         img_name = frames[i] + ".png"
+        img_dir =  img_dirs[i]
 
         if i % skip == skip - 2:
             # print(path.join(trajectory_dir, img_name))
-            obs = cv2.imread(path.join(trajectory_dir, img_name))
+            obs = cv2.imread(path.join(trajectory_dir, img_dir, img_name))
             
             # print(type(obs))
             obs_buffer[0] = obs
         if i % skip == skip - 1:
             # print(path.join(trajectory_dir, img_name))
-            obs = cv2.imread(path.join(trajectory_dir, img_name))
+            obs = cv2.imread(path.join(trajectory_dir, img_dir, img_name))
             obs_buffer[1] = obs
             # if(i==3):
             #     print(path.join(trajectory_dir, img_name))
@@ -377,7 +380,8 @@ def get_sorted_traj_indices(env_name, dataset):
         # elif dataset.trajectories[g][t][-1]['terminal']:
         traj_indices.append(t)
         traj_scores.append(dataset.trajectories[game][t][-1]['score'])
-        traj_dirs.append(dataset.trajectories[game][t][-1]['img_dir'])
+        # a separate img_dir defined for every frame of the trajectory as two different trials could comprise an episode
+        traj_dirs.append([dataset.trajectories[game][t][i]['img_dir'] for i in range(len(dataset.trajectories[game][t]))])
         traj_rewards.append([dataset.trajectories[game][t][i]['reward'] for i in range(len(dataset.trajectories[game][t]))])
         traj_gaze.append([dataset.trajectories[game][t][i]['gaze_positions'] for i in range(len(dataset.trajectories[game][t]))])
         traj_frames.append([dataset.trajectories[game][t][i]['frame'] for i in range(len(dataset.trajectories[game][t]))])
@@ -450,11 +454,13 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, mask_sc
     # img_frames = []
     print('len demos: ',len(demos))
     for indx, score, img_dir, rew, gaze, frame in demos:
+        print(indx)
+        # print(img_dir)
         human_scores.append(score)
 
         # traj_dir = path.join(data_dir, 'screens', env_name, str(indx))
-        traj_dir = path.join(data_dir, env_name, img_dir)
-        maxed_traj = MaxSkipAndWarpFrames(traj_dir, frame)
+        traj_dir = path.join(data_dir, env_name)
+        maxed_traj = MaxSkipAndWarpFrames(traj_dir, img_dir, frame)
         stacked_traj = StackFrames(maxed_traj)
 
         demo_norm_mask = []
