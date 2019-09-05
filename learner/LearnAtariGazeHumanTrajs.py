@@ -402,6 +402,9 @@ if __name__=="__main__":
 	elif env_name == "pong":
 		env_id = "PongNoFrameskip-v4"
 		agc_env_name = "pong"
+	elif env_name == "beamrider":
+		env_id = "BeamRiderNoFrameskip-v4"
+		agc_env_name = "beamrider"
 	else:
 		print("env_name not supported")
 		sys.exit(1)
