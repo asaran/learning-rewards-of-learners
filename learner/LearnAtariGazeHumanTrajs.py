@@ -399,6 +399,9 @@ if __name__=="__main__":
 	elif env_name == "enduro":
 		env_id = "EnduroNoFrameskip-v4"
 		agc_env_name = "enduro"
+	elif env_name == "pong":
+		env_id = "PongNoFrameskip-v4"
+		agc_env_name = "pong"
 	else:
 		print("env_name not supported")
 		sys.exit(1)
