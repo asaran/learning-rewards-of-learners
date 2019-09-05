@@ -325,9 +325,9 @@ def calc_accuracy(reward_network, training_inputs, training_outputs, training_ga
 				gaze26_i, gaze26_j = training_gaze26[i]
 				# gaze11_i, gaze11_j = training_gaze11[i]
 				# gaze_coords_i, gaze_coords_j = training_gaze[i]
-				outputs, _, _ = reward_network.forward(traj_i, traj_j, gaze26_i, gaze26_j, train=False)
+				outputs, _, _, _ = reward_network.forward(traj_i, traj_j, gaze26_i, gaze26_j, train=False)
 			else:
-				outputs, _, _ = reward_network.forward(traj_i, traj_j, train=False)
+				outputs, _, _, _ = reward_network.forward(traj_i, traj_j, train=False)
 
 			#forward to get logits
 			
@@ -507,7 +507,7 @@ if __name__=="__main__":
 	for i, p in enumerate(pred_returns):
 		print(i,p,sum(learning_rewards[i]),learning_returns[i])
 
-	print("accuracy", calc_accuracy(reward_net, training_obs, training_labels, training_gaze, gaze_dropout))
+	print("accuracy", calc_accuracy(reward_net, training_obs, training_labels, training_gaze26, gaze_dropout))
 
 	#TODO:add checkpoints to training process
 	torch.save(reward_net.state_dict(), args.reward_model_path+"/model.pth")
