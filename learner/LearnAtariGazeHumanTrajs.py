@@ -295,6 +295,10 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
 				cum_loss = 0.0
 				print("check pointing")
 				torch.save(reward_net.state_dict(), checkpoint_dir+"/"+str(i)+'.pth')
+			torch.cuda.empty_cache() 
+
+		torch.cuda.empty_cache() 
+	
 	print("finished training")
 
 
@@ -337,6 +341,7 @@ def calc_accuracy(reward_network, training_inputs, training_outputs, training_ga
 			#print(label)
 			if pred_label.item() == label:
 				num_correct += 1.
+			torch.cuda.empty_cache() 
 	return num_correct / len(training_inputs)
 
 
@@ -507,6 +512,7 @@ if __name__=="__main__":
 	import torch.optim as optim
 	optimizer = optim.Adam(reward_net.parameters(),  lr=lr, weight_decay=weight_decay)
 	learn_reward(reward_net, optimizer, training_data, num_iter, l1_reg, args.reward_model_path, gaze_loss_type, gaze_reg, gaze_dropout)
+	torch.cuda.empty_cache() 
 
 	with torch.no_grad():
 		pred_returns = [predict_traj_return(reward_net, traj) for traj in demonstrations]
