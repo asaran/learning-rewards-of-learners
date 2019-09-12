@@ -8,6 +8,12 @@ data/*
 learner/eval/*.txt
 learner/viz/*
 learner/viz_no-gaze/*
+learner/gym/*
+learner/viz-SA/*
+*.ods
+
+gazeNetwork/__pycache__/*
+gazeNetwork/pretrained_models/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
